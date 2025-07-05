@@ -7,6 +7,7 @@ import tsParser from '@typescript-eslint/parser';
 import importPlugin from 'eslint-plugin-import';
 import a11y from 'eslint-plugin-jsx-a11y';
 import prettier from 'eslint-plugin-prettier';
+import unusedImports from 'eslint-plugin-unused-imports';
 
 export default [
   // Global ignores
@@ -54,7 +55,11 @@ export default [
       ...ts.configs.recommended.rules,
       '@typescript-eslint/no-unused-vars': [
         'error',
-        { argsIgnorePattern: '^_' },
+        {
+          argsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
+          ignoreRestSiblings: true,
+        },
       ],
       '@typescript-eslint/consistent-type-imports': [
         'warn',
@@ -81,6 +86,7 @@ export default [
       import: importPlugin,
       'jsx-a11y': a11y,
       prettier,
+      'unused-imports': unusedImports,
     },
     settings: {
       react: {
@@ -135,7 +141,19 @@ export default [
       ],
       'import/no-unresolved': 'off', // Turn off for now, let TypeScript handle it
       'import/no-duplicates': 'error',
-      'import/no-unused-modules': 'off', // Turn off for now
+      'import/no-unused-modules': 'warn', // Enable to catch unused imports
+
+      // Unused imports detection
+      'unused-imports/no-unused-imports': 'error',
+      'unused-imports/no-unused-vars': [
+        'warn',
+        {
+          vars: 'all',
+          varsIgnorePattern: '^_',
+          args: 'after-used',
+          argsIgnorePattern: '^_',
+        },
+      ],
 
       // Accessibility rules
       'jsx-a11y/alt-text': 'error',

@@ -1,5 +1,3 @@
-import React from 'react';
-
 import { Button } from '~/components/ui/button';
 import {
   Dialog,
@@ -34,9 +32,8 @@ const PrefectureModal: React.FC<PrefectureModalProps> = ({
 }) => {
   if (!prefecture) return null;
 
-  const progressPercentage = prefecture.total > 0
-    ? (prefecture.visited / prefecture.total) * 100
-    : 0;
+  const progressPercentage =
+    prefecture.total > 0 ? (prefecture.visited / prefecture.total) * 100 : 0;
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
