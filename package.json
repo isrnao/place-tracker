@@ -4,13 +4,21 @@
   "type": "module",
   "scripts": {
     "build": "react-router build",
+    "build:server": "vite build --config vite.config.server.ts",
     "dev": "react-router dev",
+    "dev:server": "ts-node-dev --respawn --transpile-only server/index.ts",
     "start": "react-router-serve ./build/server/index.js",
+    "start:server": "node dist/server/index.js",
     "typecheck": "react-router typegen && tsc"
   },
   "dependencies": {
+    "@react-router/express": "^7.6.3",
+    "@react-router/fs-routes": "^7.6.3",
     "@react-router/node": "^7.5.3",
     "@react-router/serve": "^7.5.3",
+    "@supabase/supabase-js": "^2.50.3",
+    "@tanstack/react-query": "^5.81.5",
+    "express": "^5.1.0",
     "isbot": "^5.1.27",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
@@ -19,10 +27,12 @@
   "devDependencies": {
     "@react-router/dev": "^7.5.3",
     "@tailwindcss/vite": "^4.1.4",
+    "@types/express": "^5.0.3",
     "@types/node": "^20",
     "@types/react": "^19.1.2",
     "@types/react-dom": "^19.1.2",
     "tailwindcss": "^4.1.4",
+    "ts-node-dev": "^2.0.0",
     "typescript": "^5.8.3",
     "vite": "^6.3.3",
     "vite-tsconfig-paths": "^5.1.4"
