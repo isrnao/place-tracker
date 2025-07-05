@@ -1,32 +1,69 @@
-# Welcome to React Router!
+# Place Tracker
 
-A modern, production-ready template for building full-stack React applications using React Router.
+React Router v7 + Supabase + TanStack Query を使用したSSR対応の場所追跡アプリケーション
 
-[![Open in StackBlitz](https://developer.stackblitz.com/img/open_in_stackblitz.svg)](https://stackblitz.com/github/remix-run/react-router-templates/tree/main/default)
+## 機能
 
-## Features
+- **ファイルベースルーティング**: React Router v7の最新機能を使用
+- **SSR対応**: サーバーサイドレンダリングとクライアントサイドレンダリングの両方をサポート
+- **Supabase統合**: リアルタイムデータベース操作
+- **TanStack Query**: 効率的なデータフェッチとキャッシュ
+- **TypeScript**: 完全な型安全性
+- **Tailwind CSS**: モダンなUI
 
-- 🚀 Server-side rendering
-- ⚡️ Hot Module Replacement (HMR)
-- 📦 Asset bundling and optimization
-- 🔄 Data loading and mutations
-- 🔒 TypeScript by default
-- 🎉 TailwindCSS for styling
-- 📖 [React Router docs](https://reactrouter.com/)
+## セットアップ
 
-## Getting Started
+1. 依存関係のインストール:
+   ```bash
+   pnpm install
+   ```
 
-### Installation
+2. 環境変数の設定:
+   `.env`ファイルを作成し、以下を設定:
+   ```env
+   SUPABASE_URL=your_supabase_url_here
+   SUPABASE_ANON_KEY=your_supabase_anon_key_here
+   ```
 
-Install the dependencies:
+3. 開発サーバーの起動:
+   ```bash
+   # React Router dev server
+   pnpm dev
+
+   # または Express SSR server
+   pnpm dev:server
+   ```
+
+## ビルド
 
 ```bash
-npm install
+# クライアントビルド
+pnpm build
+
+# サーバービルド
+pnpm build:server
+
+# 本番サーバー起動
+pnpm start:server
 ```
 
-### Development
+## アーキテクチャ
 
-Start the development server with HMR:
+- **app/routes/**: ファイルベースルーティング
+- **app/api/**: Supabaseヘルパー関数
+- **app/entry.client.tsx**: クライアントエントリーポイント
+- **app/entry.server.tsx**: サーバーエントリーポイント
+- **server/index.ts**: Express SSRサーバー
+
+## 主な技術スタック
+
+- React Router v7
+- Supabase
+- TanStack Query
+- TypeScript
+- Tailwind CSS
+- Express
+- Vite
 
 ```bash
 npm run dev
