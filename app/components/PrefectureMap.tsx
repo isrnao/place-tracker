@@ -52,9 +52,13 @@ const calculateCentroid = (feature: Feature): [number, number] => {
 
 interface PrefectureMapProps {
   features: Feature[];
+  categorySlug?: string;
 }
 
-const PrefectureMap: React.FC<PrefectureMapProps> = ({ features }) => {
+const PrefectureMap: React.FC<PrefectureMapProps> = ({
+  features,
+  categorySlug,
+}) => {
   const mapRef = useRef<MapRef>(null);
   const [hoveredFeatureId, setHoveredFeatureId] = useState<
     string | number | null
@@ -200,17 +204,22 @@ const PrefectureMap: React.FC<PrefectureMapProps> = ({ features }) => {
   // 進捗度に基づく色の式を生成（メモ化）
 
   // 都道府県の詳細データを取得する関数
-  const fetchPrefectureData = useCallback(async (prefectureId: number) => {
-    try {
-      const response = await fetch(`/prefecture-data?id=${prefectureId}`);
-      if (!response.ok) throw new Error('Failed to fetch');
-      const data = await response.json();
-      return data;
-    } catch (err) {
-      console.error('Error fetching prefecture data:', err);
-      return { places: [], prefecture: null };
-    }
-  }, []);
+  const fetchPrefectureData = useCallback(
+    async (prefectureId: number) => {
+      try {
+        const params = new URLSearchParams({ id: String(prefectureId) });
+        if (categorySlug) params.set('category', categorySlug);
+        const response = await fetch(`/prefecture-data?${params.toString()}`);
+        if (!response.ok) throw new Error('Failed to fetch');
+        const data = await response.json();
+        return data;
+      } catch (err) {
+        console.error('Error fetching prefecture data:', err);
+        return { places: [], prefecture: null };
+      }
+    },
+    [categorySlug]
+  );
 
   // 訪問状態を切り替える関数
   const handleToggleVisit = useCallback(
