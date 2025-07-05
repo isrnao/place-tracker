@@ -15,7 +15,7 @@ async function fetchPlacesAndProgress(
         p_category: categoryId ?? null,
       });
       if (error) throw new Error(JSON.stringify(error));
-      
+
       return {
         places: data,
         prefecture: getMockData
