@@ -5,6 +5,7 @@ import type { FeatureCollection, Feature } from 'geojson';
 import { useLoaderData } from 'react-router';
 
 import { supabase, getMockData, categories } from '~/api/supabase.server';
+import type { CategorySlug } from '~/api/supabase.server';
 import PrefectureListSidebar from '~/components/PrefectureListSidebar';
 import PrefectureMap from '~/components/PrefectureMap';
 
@@ -23,8 +24,8 @@ export function meta({ data }: Route.MetaArgs) {
 }
 
 export async function loader({ params }: Route.LoaderArgs) {
-  const slug = params.slug;
-  const category = categories.find(c => c.slug === slug);
+  const slug = params.slug as CategorySlug | undefined;
+  const category = slug ? categories.find(c => c.slug === slug) : undefined;
   if (!category) {
     throw new Response('Category not found', { status: 404 });
   }

@@ -1,11 +1,12 @@
 import { supabase, getMockData, categories } from '~/api/supabase.server';
+import type { CategorySlug } from '~/api/supabase.server';
 
 import type { Route } from './+types/prefecture-data';
 
 export async function loader({ request }: Route.LoaderArgs) {
   const url = new URL(request.url);
   const prefectureId = Number(url.searchParams.get('id'));
-  const categorySlug = url.searchParams.get('category') || undefined;
+  const categorySlug = url.searchParams.get('category') as CategorySlug | null;
   const category = categorySlug
     ? categories.find(c => c.slug === categorySlug)
     : undefined;

@@ -229,7 +229,13 @@ const PrefectureMap: React.FC<PrefectureMapProps> = ({
         formData.append('placeId', placeId.toString());
         formData.append('visited', visited.toString());
 
-        const response = await fetch('/prefecture-data', {
+        const params = new URLSearchParams();
+        if (categorySlug) params.set('category', categorySlug);
+        const url = params.size
+          ? `/prefecture-data?${params.toString()}`
+          : '/prefecture-data';
+
+        const response = await fetch(url, {
           method: 'POST',
           body: formData,
         });
@@ -250,7 +256,7 @@ const PrefectureMap: React.FC<PrefectureMapProps> = ({
         console.error('Error toggling visit:', err);
       }
     },
-    [selectedPrefecture, fetchPrefectureData]
+    [selectedPrefecture, fetchPrefectureData, categorySlug]
   );
 
   // マップクリック処理

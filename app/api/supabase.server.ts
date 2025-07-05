@@ -22,15 +22,20 @@ export const supabase = hasValidSupabaseConfig
 
 // モックデータの関数
 export const categories = [
-  { id: 1, slug: 'stations', name: '主要駅' },
-  { id: 2, slug: 'temples', name: '有名寺院' },
-  { id: 3, slug: 'sightseeing', name: '観光地' },
-  { id: 4, slug: 'parks', name: '公園' },
-  { id: 5, slug: 'museums', name: '博物館' },
-  { id: 6, slug: 'castles', name: '城跡' },
-  { id: 7, slug: 'hot-springs', name: '温泉' },
-  { id: 8, slug: 'viewpoints', name: '展望台' },
-];
+  { id: 1, key: 'station', slug: 'stations', name: '主要駅' },
+  { id: 2, key: 'temple', slug: 'temples', name: '有名寺院' },
+  { id: 3, key: 'sight', slug: 'sightseeing', name: '観光地' },
+  { id: 4, key: 'park', slug: 'parks', name: '公園' },
+  { id: 5, key: 'museum', slug: 'museums', name: '博物館' },
+  { id: 6, key: 'castle', slug: 'castles', name: '城跡' },
+  { id: 7, key: 'hotSpring', slug: 'hot-springs', name: '温泉' },
+  { id: 8, key: 'view', slug: 'viewpoints', name: '展望台' },
+] as const;
+
+export type Category = (typeof categories)[number];
+export type CategoryId = Category['id'];
+export type CategorySlug = Category['slug'];
+export type CategoryKey = Category['key'];
 
 const prefectureNames = [
   '北海道',
@@ -213,5 +218,12 @@ export const getMockData = {
     return category_id
       ? places.filter(p => p.category_id === category_id)
       : places;
+  },
+
+  places_by_category: (category_id: number) => {
+    const all = prefectureNames.flatMap((_, idx) =>
+      generatePlaces(idx + 1).filter(p => p.category_id === category_id)
+    );
+    return all;
   },
 };

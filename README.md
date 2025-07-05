@@ -10,6 +10,22 @@ React Router v7 + Supabase + TanStack Query を使用したSSR対応の場所追
 - **TanStack Query**: 効率的なデータフェッチとキャッシュ
 - **TypeScript**: 完全な型安全性
 - **Tailwind CSS**: モダンなUI
+- **属性別管理ページ**: `/attributes/:slug` でカテゴリーごとの場所を管理
+
+### Categories
+
+利用可能な `slug` 一覧:
+
+```
+stations
+temples
+sightseeing
+parks
+museums
+castles
+hot-springs
+viewpoints
+```
 
 ## セットアップ
 
