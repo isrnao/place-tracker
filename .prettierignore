@@ -1,0 +1,16 @@
+build/
+dist/
+node_modules/
+public/
+*.min.js
+*.min.css
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
+.env
+.env.local
+.env.production
+.env.test
+coverage/
+*.log
+*.tsbuildinfo

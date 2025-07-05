@@ -1,19 +1,19 @@
-import { defineConfig } from "vite";
-import tsconfigPaths from "vite-tsconfig-paths";
+import { defineConfig } from 'vite';
+import tsconfigPaths from 'vite-tsconfig-paths';
 
 export default defineConfig({
   plugins: [tsconfigPaths()],
   build: {
-    ssr: "server/index.ts",
-    outDir: "dist/server",
+    ssr: 'server/index.ts',
+    outDir: 'dist/server',
     rollupOptions: {
-      external: ["express"],
+      external: ['express'],
       output: {
-        format: "esm"
-      }
+        format: 'esm',
+      },
     },
   },
   ssr: {
-    noExternal: ["@supabase/supabase-js", "@tanstack/react-query"]
-  }
+    noExternal: ['@supabase/supabase-js', '@tanstack/react-query'],
+  },
 });

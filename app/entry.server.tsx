@@ -1,10 +1,11 @@
-import { PassThrough } from "node:stream";
-import type { EntryContext } from "react-router";
-import { createReadableStreamFromReadable } from "@react-router/node";
-import { ServerRouter } from "react-router";
-import { isbot } from "isbot";
-import { renderToPipeableStream } from "react-dom/server";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { PassThrough } from 'node:stream';
+
+import { createReadableStreamFromReadable } from '@react-router/node';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { isbot } from 'isbot';
+import { renderToPipeableStream } from 'react-dom/server';
+import type { EntryContext } from 'react-router';
+import { ServerRouter } from 'react-router';
 
 export default function handleRequest(
   request: Request,
@@ -20,7 +21,7 @@ export default function handleRequest(
     },
   });
 
-  return isbot(request.headers.get("user-agent") || "")
+  return isbot(request.headers.get('user-agent') || '')
     ? handleBotRequest(
         request,
         responseStatusCode,
@@ -53,7 +54,7 @@ function createRenderStream(
       const body = new PassThrough();
       const stream = createReadableStreamFromReadable(body);
 
-      responseHeaders.set("Content-Type", "text/html");
+      responseHeaders.set('Content-Type', 'text/html');
 
       resolve(
         new Response(stream, {
@@ -77,8 +78,7 @@ function createRenderStream(
       },
       ...(readyEventName === 'onAllReady'
         ? { onAllReady: handleReady }
-        : { onShellReady: handleReady }
-      )
+        : { onShellReady: handleReady }),
     };
 
     const { pipe, abort } = renderToPipeableStream(
