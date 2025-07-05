@@ -14,18 +14,21 @@ React Router v7 + Supabase + TanStack Query を使用したSSR対応の場所追
 ## セットアップ
 
 1. 依存関係のインストール:
+
    ```bash
    pnpm install
    ```
 
 2. 環境変数の設定:
    `.env`ファイルを作成し、以下を設定:
+
    ```env
    SUPABASE_URL=your_supabase_url_here
    SUPABASE_ANON_KEY=your_supabase_anon_key_here
    ```
 
 3. 開発サーバーの起動:
+
    ```bash
    # React Router dev server
    pnpm dev

@@ -1,7 +1,8 @@
-import type { Config } from "@react-router/dev/config";
+import type { Config } from '@react-router/dev/config';
 
 export default {
-  // Config options...
-  // Server-side render by default, to enable SPA mode set this to `false`
+  // Framework Mode - ファイルベースルーティングを有効化
   ssr: true,
+  // ファイルベースルーティングを使用（routes.tsは不要）
+  // ファイル名がそのままルートになる
 } satisfies Config;
