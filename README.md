@@ -14,18 +14,18 @@ React Router v7 + Supabase + TanStack Query を使用したSSR対応の場所追
 
 ### Categories
 
-利用可能な `slug` 一覧:
+利用可能なカテゴリの一覧:
 
-```
-stations
-temples
-sightseeing
-parks
-museums
-castles
-hot-springs
-viewpoints
-```
+| slug          | 日本語名 |
+| ------------- | -------- |
+| `stations`    | 主要駅   |
+| `temples`     | 有名寺院 |
+| `sightseeing` | 観光地   |
+| `parks`       | 公園     |
+| `museums`     | 博物館   |
+| `castles`     | 城跡     |
+| `hot-springs` | 温泉     |
+| `viewpoints`  | 展望台   |
 
 ## セットアップ
 
