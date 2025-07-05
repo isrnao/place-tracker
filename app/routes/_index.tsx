@@ -1,6 +1,11 @@
 import type { Route } from "./+types/_index";
 import { useLoaderData } from "react-router";
 import { supabase, getMockData } from "~/api/supabase.server";
+import PrefectureMap from "~/components/PrefectureMap";
+import "maplibre-gl/dist/maplibre-gl.css";
+import { readFile } from "fs/promises";
+import { resolve } from "path";
+import type { FeatureCollection, Feature } from "geojson";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -11,59 +16,65 @@ export function meta({}: Route.MetaArgs) {
 
 export async function loader() {
   try {
-    // Supabaseクライアントが利用可能な場合は使用
-    if (supabase) {
-      const { data, error } = await supabase.rpc("prefecture_progress");
-      if (error) throw new Response(JSON.stringify(error), { status: 500 });
-      return data;
-    } else {
-      // モックデータを使用
-      return getMockData.prefecture_progress();
-    }
+    // ❶ progress 集計
+    const progress = supabase
+      ? (await supabase.rpc("prefecture_progress")).data ?? getMockData.prefecture_progress()
+      : getMockData.prefecture_progress();
+
+    // ❂ GeoJSON ファイル (public/) を読み込む
+    const geoJsonPath = resolve("public/japan-prefectures.geojson");
+    const geoJsonContent = await readFile(geoJsonPath, "utf-8");
+    const geo = JSON.parse(geoJsonContent) as FeatureCollection;
+
+    // progress を GeoJSON Feature にマージ
+    const features = geo.features.map((f: Feature) => {
+      const p = progress.find((r: any) => r.id === f.properties?.id);
+      return {
+        ...f,
+        properties: {
+          ...f.properties,
+          visited: p?.visited ?? 0,
+          total: p?.total ?? 0,
+          progress: p && p.total > 0 ? p.visited / p.total : 0,
+        },
+      };
+    });
+
+    return { features };
   } catch (err) {
-    // Fallback data for demo purposes
-    return getMockData.prefecture_progress();
+    // Fallback: モックデータのみ使用
+    const progress = getMockData.prefecture_progress();
+    const features = progress.map((p, index) => ({
+      type: "Feature" as const,
+      properties: {
+        id: p.id,
+        nam_ja: p.name,
+        visited: p.visited,
+        total: p.total,
+        progress: p.total > 0 ? p.visited / p.total : 0,
+      },
+      geometry: {
+        type: "Point" as const,
+        coordinates: [139.7 + (index % 10 - 5) * 0.5, 37.5 + Math.floor(index / 10) * 0.5],
+      },
+    } as Feature));
+
+    return { features };
   }
 }
 
 export default function Home() {
-  const prefectures = useLoaderData<typeof loader>();
+  const { features } = useLoaderData<typeof loader>();
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="text-center">
-          <h1 className="text-4xl font-bold tracking-tight text-gray-900 sm:text-5xl">
-            Place Tracker
-          </h1>
-          <p className="mt-4 text-xl text-gray-600">
-            日本全国の場所を訪問してマークしよう
-          </p>
-        </div>
-
-        <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {prefectures?.map((prefecture: any) => (
-            <div key={prefecture.id} className="rounded-lg bg-white p-6 shadow-sm ring-1 ring-gray-200">
-              <h3 className="text-lg font-semibold text-gray-900">{prefecture.name}</h3>
-              <p className="mt-2 text-sm text-gray-600">
-                訪問済み: {prefecture.visited} / {prefecture.total}
-              </p>
-              <div className="mt-4 w-full bg-gray-200 rounded-full h-2">
-                <div
-                  className="bg-blue-600 h-2 rounded-full"
-                  style={{ width: `${(prefecture.visited / prefecture.total) * 100}%` }}
-                />
-              </div>
-              <a
-                href={`/prefecture/${prefecture.id}`}
-                className="mt-4 inline-block rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700"
-              >
-                詳細を見る
-              </a>
-            </div>
-          ))}
-        </div>
+    <main className="relative h-screen">
+      <div className="absolute top-4 right-4 z-20 bg-white rounded-lg shadow-lg p-4 max-w-sm">
+        <h1 className="text-xl font-bold text-gray-900 mb-2">Place Tracker</h1>
+        <p className="text-sm text-gray-600">
+          日本地図をクリックして各都道府県の詳細を確認できます
+        </p>
       </div>
-    </div>
+      <PrefectureMap features={features} />
+    </main>
   );
 }
