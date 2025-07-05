@@ -3,6 +3,44 @@ import type { CategorySlug } from '~/api/supabase.server';
 
 import type { Route } from './+types/prefecture-data';
 
+// ヘルパー関数: 場所データと進捗データの取得
+async function fetchPlacesAndProgress(
+  prefectureId: number,
+  categoryId?: number
+) {
+  try {
+    if (supabase) {
+      const { data, error } = await supabase.rpc('places_with_visit', {
+        p_prefecture: prefectureId,
+        p_category: categoryId ?? null,
+      });
+      if (error) throw new Error(JSON.stringify(error));
+      
+      return {
+        places: data,
+        prefecture: getMockData
+          .prefecture_progress(categoryId)
+          .find(p => p.id === prefectureId),
+      };
+    }
+    // Supabaseが利用不可の場合、モックデータを使用
+    return {
+      places: getMockData.places_with_visit(prefectureId, categoryId),
+      prefecture: getMockData
+        .prefecture_progress(categoryId)
+        .find(p => p.id === prefectureId),
+    };
+  } catch {
+    // エラー時のフォールバック: モックデータを使用
+    return {
+      places: getMockData.places_with_visit(prefectureId, categoryId),
+      prefecture: getMockData
+        .prefecture_progress(categoryId)
+        .find(p => p.id === prefectureId),
+    };
+  }
+}
+
 export async function loader({ request }: Route.LoaderArgs) {
   const url = new URL(request.url);
   const prefectureId = Number(url.searchParams.get('id'));
@@ -15,35 +53,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     throw new Response('Prefecture ID is required', { status: 400 });
   }
 
-  try {
-    if (supabase) {
-      const { data, error } = await supabase.rpc('places_with_visit', {
-        p_prefecture: prefectureId,
-        p_category: category?.id ?? null,
-      });
-      if (error) throw new Response(JSON.stringify(error), { status: 500 });
-      return {
-        places: data,
-        prefecture: getMockData
-          .prefecture_progress(category?.id)
-          .find(p => p.id === prefectureId),
-      };
-    } else {
-      return {
-        places: getMockData.places_with_visit(prefectureId, category?.id),
-        prefecture: getMockData
-          .prefecture_progress(category?.id)
-          .find(p => p.id === prefectureId),
-      };
-    }
-  } catch {
-    return {
-      places: getMockData.places_with_visit(prefectureId, category?.id),
-      prefecture: getMockData
-        .prefecture_progress(category?.id)
-        .find(p => p.id === prefectureId),
-    };
-  }
+  return await fetchPlacesAndProgress(prefectureId, category?.id);
 }
 
 export async function action({ request }: Route.ActionArgs) {

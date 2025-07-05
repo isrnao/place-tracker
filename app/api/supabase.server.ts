@@ -37,6 +37,16 @@ export type CategoryId = Category['id'];
 export type CategorySlug = Category['slug'];
 export type CategoryKey = Category['key'];
 
+export async function fetchPlacesByCategory(categoryId: CategoryId) {
+  if (supabase) {
+    const { data } = await supabase.rpc('places_by_category', {
+      p_category: categoryId,
+    });
+    return data ?? [];
+  }
+  return getMockData.places_by_category(categoryId);
+}
+
 const prefectureNames = [
   '北海道',
   '青森県',
@@ -221,9 +231,8 @@ export const getMockData = {
   },
 
   places_by_category: (category_id: number) => {
-    const all = prefectureNames.flatMap((_, idx) =>
-      generatePlaces(idx + 1).filter(p => p.category_id === category_id)
+    return prefectureNames.flatMap((_, index) =>
+      generatePlaces(index + 1).filter(p => p.category_id === category_id)
     );
-    return all;
   },
 };
