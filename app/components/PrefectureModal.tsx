@@ -34,7 +34,9 @@ const PrefectureModal: React.FC<PrefectureModalProps> = ({
 }) => {
   if (!prefecture) return null;
 
-  const progressPercentage = (prefecture.visited / prefecture.total) * 100;
+  const progressPercentage = prefecture.total > 0
+    ? (prefecture.visited / prefecture.total) * 100
+    : 0;
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
