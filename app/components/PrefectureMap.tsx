@@ -7,6 +7,8 @@ import React, {
   useState,
   useMemo,
   useCallback,
+  startTransition,
+  useOptimistic,
 } from 'react';
 import { Map, Source, Layer } from 'react-map-gl/maplibre';
 import type { MapRef } from 'react-map-gl/maplibre';
@@ -79,6 +81,13 @@ const PrefectureMap: React.FC<PrefectureMapProps> = ({
     name: string;
     visited: boolean;
   }> | null>(null);
+  const [optimisticPlaces, updateOptimistic] = useOptimistic(
+    modalPlaces,
+    (state, update: { id: number; visited: boolean }) =>
+      state?.map(p =>
+        p.id === update.id ? { ...p, visited: !update.visited } : p
+      ) || state
+  );
 
   // 日本の都道府県のIDリスト（1-47）
   const japanPrefectureIds = useMemo(
@@ -225,6 +234,7 @@ const PrefectureMap: React.FC<PrefectureMapProps> = ({
   const handleToggleVisit = useCallback(
     async (placeId: number, visited: boolean) => {
       try {
+        updateOptimistic({ id: placeId, visited });
         const formData = new FormData();
         formData.append('placeId', placeId.toString());
         formData.append('visited', visited.toString());
@@ -247,16 +257,18 @@ const PrefectureMap: React.FC<PrefectureMapProps> = ({
           const { places, prefecture } = await fetchPrefectureData(
             selectedPrefecture.id
           );
-          setModalPlaces(places);
-          if (prefecture) {
-            setSelectedPrefecture(prefecture);
-          }
+          startTransition(() => {
+            setModalPlaces(places);
+            if (prefecture) {
+              setSelectedPrefecture(prefecture);
+            }
+          });
         }
       } catch (err) {
         console.error('Error toggling visit:', err);
       }
     },
-    [selectedPrefecture, fetchPrefectureData, categorySlug]
+    [selectedPrefecture, fetchPrefectureData, categorySlug, updateOptimistic]
   );
 
   // マップクリック処理
@@ -277,9 +289,11 @@ const PrefectureMap: React.FC<PrefectureMapProps> = ({
           const { places, prefecture } =
             await fetchPrefectureData(prefectureId);
           if (prefecture) {
-            setSelectedPrefecture(prefecture);
-            setModalPlaces(places);
-            setIsModalOpen(true);
+            startTransition(() => {
+              setSelectedPrefecture(prefecture);
+              setModalPlaces(places);
+              setIsModalOpen(true);
+            });
           }
         }
       }
@@ -350,9 +364,11 @@ const PrefectureMap: React.FC<PrefectureMapProps> = ({
     async (prefectureId: number) => {
       const { places, prefecture } = await fetchPrefectureData(prefectureId);
       if (prefecture) {
-        setSelectedPrefecture(prefecture);
-        setModalPlaces(places);
-        setIsModalOpen(true);
+        startTransition(() => {
+          setSelectedPrefecture(prefecture);
+          setModalPlaces(places);
+          setIsModalOpen(true);
+        });
       }
     },
     [fetchPrefectureData]
@@ -522,7 +538,7 @@ const PrefectureMap: React.FC<PrefectureMapProps> = ({
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         prefecture={selectedPrefecture}
-        places={modalPlaces}
+        places={optimisticPlaces}
         onToggleVisit={handleToggleVisit}
       />
     </div>

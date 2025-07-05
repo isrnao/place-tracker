@@ -1,13 +1,18 @@
 import { readFile } from 'fs/promises';
 import { resolve } from 'path';
 
-import type { FeatureCollection, Feature } from 'geojson';
+import type { FeatureCollection } from 'geojson';
 import { useLoaderData } from 'react-router';
 
 import { supabase, getMockData, categories } from '~/api/supabase.server';
 import type { CategorySlug } from '~/api/supabase.server';
 import PrefectureListSidebar from '~/components/PrefectureListSidebar';
 import PrefectureMap from '~/components/PrefectureMap';
+import {
+  mergeProgressWithGeoJSON,
+  createMockFeatures,
+  type PrefectureProgress,
+} from '~/lib/prefectures';
 
 import type { Route } from './+types/attributes.$slug';
 
@@ -42,53 +47,16 @@ export async function loader({ params }: Route.LoaderArgs) {
     const geoJsonContent = await readFile(geoJsonPath, 'utf-8');
     const geo = JSON.parse(geoJsonContent) as FeatureCollection;
 
-    // progress を GeoJSON Feature にマージ
-    interface PrefectureProgress {
-      id: number;
-      name: string;
-      visited: number;
-      total: number;
-    }
-
-    const features = geo.features.map((f: Feature) => {
-      const p = progress.find(
-        (r: PrefectureProgress) => r.id === f.properties?.id
-      );
-      return {
-        ...f,
-        properties: {
-          ...f.properties,
-          visited: p?.visited ?? 0,
-          total: p?.total ?? 0,
-          progress: p && p.total > 0 ? p.visited / p.total : 0,
-        },
-      };
-    });
+    const features = mergeProgressWithGeoJSON(
+      progress as PrefectureProgress[],
+      geo
+    );
 
     return { features, category };
   } catch {
     // Fallback: モックデータのみ使用
     const progress = getMockData.prefecture_progress(category.id);
-    const features = progress.map(
-      (p, index) =>
-        ({
-          type: 'Feature' as const,
-          properties: {
-            id: p.id,
-            nam_ja: p.name,
-            visited: p.visited,
-            total: p.total,
-            progress: p.total > 0 ? p.visited / p.total : 0,
-          },
-          geometry: {
-            type: 'Point' as const,
-            coordinates: [
-              139.7 + ((index % 10) - 5) * 0.5,
-              37.5 + Math.floor(index / 10) * 0.5,
-            ],
-          },
-        }) as Feature
-    );
+    const features = createMockFeatures(progress as PrefectureProgress[]);
 
     return { features, category };
   }
