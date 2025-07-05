@@ -37,6 +37,61 @@ export default function handleRequest(
       );
 }
 
+function createRenderStream(
+  request: Request,
+  responseStatusCode: number,
+  responseHeaders: Headers,
+  entryContext: EntryContext,
+  queryClient: QueryClient,
+  readyEventName: 'onAllReady' | 'onShellReady'
+) {
+  return new Promise((resolve, reject) => {
+    let shellRendered = false;
+
+    const handleReady = () => {
+      shellRendered = true;
+      const body = new PassThrough();
+      const stream = createReadableStreamFromReadable(body);
+
+      responseHeaders.set("Content-Type", "text/html");
+
+      resolve(
+        new Response(stream, {
+          headers: responseHeaders,
+          status: responseStatusCode,
+        })
+      );
+
+      pipe(body);
+    };
+
+    const streamOptions = {
+      onShellError(error: unknown) {
+        reject(error);
+      },
+      onError(error: unknown) {
+        responseStatusCode = 500;
+        if (shellRendered) {
+          console.error(error);
+        }
+      },
+      ...(readyEventName === 'onAllReady'
+        ? { onAllReady: handleReady }
+        : { onShellReady: handleReady }
+      )
+    };
+
+    const { pipe, abort } = renderToPipeableStream(
+      <QueryClientProvider client={queryClient}>
+        <ServerRouter context={entryContext} url={request.url} />
+      </QueryClientProvider>,
+      streamOptions
+    );
+
+    setTimeout(abort, 5000);
+  });
+}
+
 function handleBotRequest(
   request: Request,
   responseStatusCode: number,
@@ -44,43 +99,14 @@ function handleBotRequest(
   entryContext: EntryContext,
   queryClient: QueryClient
 ) {
-  return new Promise((resolve, reject) => {
-    let shellRendered = false;
-    const { pipe, abort } = renderToPipeableStream(
-      <QueryClientProvider client={queryClient}>
-        <ServerRouter context={entryContext} url={request.url} />
-      </QueryClientProvider>,
-      {
-        onAllReady() {
-          shellRendered = true;
-          const body = new PassThrough();
-          const stream = createReadableStreamFromReadable(body);
-
-          responseHeaders.set("Content-Type", "text/html");
-
-          resolve(
-            new Response(stream, {
-              headers: responseHeaders,
-              status: responseStatusCode,
-            })
-          );
-
-          pipe(body);
-        },
-        onShellError(error: unknown) {
-          reject(error);
-        },
-        onError(error: unknown) {
-          responseStatusCode = 500;
-          if (shellRendered) {
-            console.error(error);
-          }
-        },
-      }
-    );
-
-    setTimeout(abort, 5000);
-  });
+  return createRenderStream(
+    request,
+    responseStatusCode,
+    responseHeaders,
+    entryContext,
+    queryClient,
+    'onAllReady'
+  );
 }
 
 function handleBrowserRequest(
@@ -90,41 +116,12 @@ function handleBrowserRequest(
   entryContext: EntryContext,
   queryClient: QueryClient
 ) {
-  return new Promise((resolve, reject) => {
-    let shellRendered = false;
-    const { pipe, abort } = renderToPipeableStream(
-      <QueryClientProvider client={queryClient}>
-        <ServerRouter context={entryContext} url={request.url} />
-      </QueryClientProvider>,
-      {
-        onShellReady() {
-          shellRendered = true;
-          const body = new PassThrough();
-          const stream = createReadableStreamFromReadable(body);
-
-          responseHeaders.set("Content-Type", "text/html");
-
-          resolve(
-            new Response(stream, {
-              headers: responseHeaders,
-              status: responseStatusCode,
-            })
-          );
-
-          pipe(body);
-        },
-        onShellError(error: unknown) {
-          reject(error);
-        },
-        onError(error: unknown) {
-          responseStatusCode = 500;
-          if (shellRendered) {
-            console.error(error);
-          }
-        },
-      }
-    );
-
-    setTimeout(abort, 5000);
-  });
+  return createRenderStream(
+    request,
+    responseStatusCode,
+    responseHeaders,
+    entryContext,
+    queryClient,
+    'onShellReady'
+  );
 }

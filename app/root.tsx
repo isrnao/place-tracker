@@ -28,7 +28,7 @@ export const links: Route.LinksFunction = () => [
 
 export function loader() {
   // could read cookies, auth, etc.
-  return { now: Date.now() };
+  return null;
 }
 
 export function Layout({ children }: { children: React.ReactNode }) {

@@ -2,6 +2,7 @@ import type { Route } from "./+types/_index";
 import { useLoaderData } from "react-router";
 import { supabase, getMockData } from "~/api/supabase.server";
 import PrefectureMap from "~/components/PrefectureMap";
+import PrefectureListSidebar from "~/components/PrefectureListSidebar";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { readFile } from "fs/promises";
 import { resolve } from "path";
@@ -66,15 +67,30 @@ export async function loader() {
 export default function Home() {
   const { features } = useLoaderData<typeof loader>();
 
+  // 都道府県リスト用のデータを準備
+  const prefectureList = features
+    .filter(f => f.properties?.id && f.properties?.nam_ja)
+    .map(f => {
+      const props = f.properties as any;
+      return {
+        id: props.id,
+        name: props.nam_ja,
+        visited: props.visited || 0,
+        total: props.total || 0,
+        progress: props.progress || 0,
+      };
+    })
+    .sort((a, b) => a.id - b.id);
+
   return (
-    <main className="relative h-screen">
-      <div className="absolute top-4 right-4 z-20 bg-white rounded-lg shadow-lg p-4 max-w-sm">
-        <h1 className="text-xl font-bold text-gray-900 mb-2">Place Tracker</h1>
-        <p className="text-sm text-gray-600">
-          日本地図をクリックして各都道府県の詳細を確認できます
-        </p>
+    <main className="relative h-screen flex">
+      {/* 左サイドバー - 都道府県リスト */}
+      <PrefectureListSidebar prefectures={prefectureList} />
+
+      {/* 右側 - マップ */}
+      <div className="flex-1 relative">
+        <PrefectureMap features={features} />
       </div>
-      <PrefectureMap features={features} />
     </main>
   );
 }

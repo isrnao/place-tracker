@@ -3,6 +3,7 @@ import { Map, Source, Layer } from "react-map-gl/maplibre";
 import type { Feature, FeatureCollection } from "geojson";
 import type { MapRef } from "react-map-gl/maplibre";
 import type { MapMouseEvent } from "maplibre-gl";
+import type { ExpressionSpecification } from "maplibre-gl";
 import PrefectureModal from "./PrefectureModal";
 
 // 都道府県の中心座標を計算する関数
@@ -131,7 +132,7 @@ const PrefectureMap: React.FC<PrefectureMapProps> = ({ features }) => {
   }), [japanFeatures]);
 
   // 進捗度に基づく色の式を生成（メモ化）
-  const fillColorExpression = useMemo(() => [
+  const fillColorExpression: ExpressionSpecification = useMemo(() => [
     "case",
     ["==", ["get", "progress"], 0],
     "#f3f4f6", // 薄いグレー（未訪問）
@@ -142,10 +143,10 @@ const PrefectureMap: React.FC<PrefectureMapProps> = ({ features }) => {
     ["<", ["get", "progress"], 0.9],
     "#fca5a5", // 薄い赤
     "#10b981" // 緑
-  ] as any, []);
+  ], []);
 
   // ホバー時の色を調整（メモ化）
-  const hoverFillColorExpression = useMemo(() => [
+  const hoverFillColorExpression: ExpressionSpecification = useMemo(() => [
     "case",
     ["==", ["get", "id"], hoveredFeatureId || -1],
     "#3b82f6", // 青色でハイライト
@@ -158,7 +159,7 @@ const PrefectureMap: React.FC<PrefectureMapProps> = ({ features }) => {
     ["<", ["get", "progress"], 0.9],
     "#fca5a5", // 薄い赤
     "#10b981" // 緑
-  ] as any, [hoveredFeatureId]);
+  ], [hoveredFeatureId]);
 
   // 都道府県の詳細データを取得する関数
   const fetchPrefectureData = useCallback(async (prefectureId: number) => {
@@ -276,6 +277,35 @@ const PrefectureMap: React.FC<PrefectureMapProps> = ({ features }) => {
     ]
   }), []);
 
+  // 都道府県リストからモーダルを開く関数
+  const openPrefectureModal = useCallback(async (prefectureId: number) => {
+    const { places, prefecture } = await fetchPrefectureData(prefectureId);
+    if (prefecture) {
+      setSelectedPrefecture(prefecture);
+      setModalPlaces(places);
+      setIsModalOpen(true);
+    }
+  }, [fetchPrefectureData]);
+
+  // 都道府県リストのクリックイベントリスナーを設定
+  useEffect(() => {
+    const handlePrefectureListClick = (event: Event) => {
+      const target = event.target as HTMLElement;
+      const listItem = target.closest('.prefecture-list-item');
+      if (listItem) {
+        const prefectureId = parseInt(listItem.getAttribute('data-prefecture-id') || '0');
+        if (prefectureId) {
+          openPrefectureModal(prefectureId);
+        }
+      }
+    };
+
+    document.addEventListener('click', handlePrefectureListClick);
+    return () => {
+      document.removeEventListener('click', handlePrefectureListClick);
+    };
+  }, [openPrefectureModal]);
+
   return (
     <div className="w-full h-full">
       <Map
@@ -294,7 +324,7 @@ const PrefectureMap: React.FC<PrefectureMapProps> = ({ features }) => {
         onLoad={handleMapLoad}
         maxBounds={[
           [120.0, 23.0], // 南西角（より広く）
-          [148.0, 47.0], // 北東角（北海道の上部と右部により余白を追加）
+          [150.0, 47.0], // 北東角（北海道の右上部により余白を追加）
         ]}
         minZoom={4}
         maxZoom={10}
