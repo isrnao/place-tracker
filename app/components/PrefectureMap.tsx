@@ -1,9 +1,44 @@
 import React, { useRef, useEffect, useState, useMemo, useCallback } from "react";
 import { Map, Source, Layer } from "react-map-gl/maplibre";
-import { useNavigate } from "react-router";
 import type { Feature, FeatureCollection } from "geojson";
 import type { MapRef } from "react-map-gl/maplibre";
 import type { MapMouseEvent } from "maplibre-gl";
+import PrefectureModal from "./PrefectureModal";
+
+// 都道府県の中心座標を計算する関数
+const calculateCentroid = (feature: Feature): [number, number] => {
+  if (feature.geometry.type === "Polygon") {
+    const coords = feature.geometry.coordinates[0];
+    let x = 0, y = 0;
+    for (const coord of coords) {
+      x += coord[0];
+      y += coord[1];
+    }
+    return [x / coords.length, y / coords.length];
+  } else if (feature.geometry.type === "MultiPolygon") {
+    // 最大の多角形の中心を使用
+    const polygons = feature.geometry.coordinates;
+    let largest = polygons[0];
+    let largestArea = 0;
+
+    for (const polygon of polygons) {
+      const area = polygon[0].length;
+      if (area > largestArea) {
+        largestArea = area;
+        largest = polygon;
+      }
+    }
+
+    const coords = largest[0];
+    let x = 0, y = 0;
+    for (const coord of coords) {
+      x += coord[0];
+      y += coord[1];
+    }
+    return [x / coords.length, y / coords.length];
+  }
+  return [0, 0];
+};
 
 interface PrefectureMapProps {
   features: Feature[];
@@ -11,8 +46,23 @@ interface PrefectureMapProps {
 
 const PrefectureMap: React.FC<PrefectureMapProps> = ({ features }) => {
   const mapRef = useRef<MapRef>(null);
-  const navigate = useNavigate();
   const [hoveredFeatureId, setHoveredFeatureId] = useState<string | number | null>(null);
+  const [currentZoom, setCurrentZoom] = useState(5.2);
+  const [mapLoaded, setMapLoaded] = useState(false);
+
+  // モーダル関連のstate
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedPrefecture, setSelectedPrefecture] = useState<{
+    id: number;
+    name: string;
+    visited: number;
+    total: number;
+  } | null>(null);
+  const [modalPlaces, setModalPlaces] = useState<Array<{
+    id: number;
+    name: string;
+    visited: boolean;
+  }> | null>(null);
 
   // 日本の都道府県のIDリスト（1-47）
   const japanPrefectureIds = useMemo(() => Array.from({ length: 47 }, (_, i) => i + 1), []);
@@ -23,6 +73,56 @@ const PrefectureMap: React.FC<PrefectureMapProps> = ({ features }) => {
       feature.properties?.id && japanPrefectureIds.includes(feature.properties.id)
     ), [features, japanPrefectureIds]
   );
+
+  // 都道府県の中心座標とラベル情報を計算
+  const prefectureLabels = useMemo(() => {
+    return japanFeatures.map(feature => {
+      const [lng, lat] = calculateCentroid(feature);
+      return {
+        id: feature.properties?.id,
+        name: feature.properties?.nam_ja,
+        longitude: lng,
+        latitude: lat,
+      };
+    });
+  }, [japanFeatures]);
+
+  // ラベルの画面座標を計算
+  const [labelPositions, setLabelPositions] = useState<Array<{
+    id: number;
+    name: string;
+    x: number;
+    y: number;
+  }>>([]);
+
+  // ラベル位置を更新する関数
+  const updateLabelPositions = useCallback(() => {
+    if (!mapRef.current || !mapLoaded) return;
+
+    const positions = prefectureLabels.map(label => {
+      const point = mapRef.current!.project([label.longitude, label.latitude]);
+      return {
+        id: label.id,
+        name: label.name || '',
+        x: point.x,
+        y: point.y,
+      };
+    });
+    setLabelPositions(positions);
+  }, [prefectureLabels, mapLoaded]);
+
+  // マップが読み込まれた時の処理
+  const handleMapLoad = useCallback(() => {
+    setMapLoaded(true);
+    updateLabelPositions();
+  }, [updateLabelPositions]);
+
+  // 初期化時とデータ変更時にラベル位置を更新
+  useEffect(() => {
+    if (mapLoaded) {
+      updateLabelPositions();
+    }
+  }, [mapLoaded, updateLabelPositions]);
 
   // GeoJSONコレクションを作成
   const geoJsonData: FeatureCollection = useMemo(() => ({
@@ -60,8 +160,48 @@ const PrefectureMap: React.FC<PrefectureMapProps> = ({ features }) => {
     "#10b981" // 緑
   ] as any, [hoveredFeatureId]);
 
+  // 都道府県の詳細データを取得する関数
+  const fetchPrefectureData = useCallback(async (prefectureId: number) => {
+    try {
+      const response = await fetch(`/prefecture-data?id=${prefectureId}`);
+      if (!response.ok) throw new Error('Failed to fetch');
+      const data = await response.json();
+      return data;
+    } catch (err) {
+      console.error('Error fetching prefecture data:', err);
+      return { places: [], prefecture: null };
+    }
+  }, []);
+
+  // 訪問状態を切り替える関数
+  const handleToggleVisit = useCallback(async (placeId: number, visited: boolean) => {
+    try {
+      const formData = new FormData();
+      formData.append("placeId", placeId.toString());
+      formData.append("visited", visited.toString());
+
+      const response = await fetch('/prefecture-data', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) throw new Error('Failed to toggle visit');
+
+      // データを再取得してモーダルを更新
+      if (selectedPrefecture) {
+        const { places, prefecture } = await fetchPrefectureData(selectedPrefecture.id);
+        setModalPlaces(places);
+        if (prefecture) {
+          setSelectedPrefecture(prefecture);
+        }
+      }
+    } catch (err) {
+      console.error('Error toggling visit:', err);
+    }
+  }, [selectedPrefecture, fetchPrefectureData]);
+
   // マップクリック処理
-  const handleMapClick = useCallback((event: MapMouseEvent) => {
+  const handleMapClick = useCallback(async (event: MapMouseEvent) => {
     if (!mapRef.current) return;
 
     const features = mapRef.current.queryRenderedFeatures(event.point, {
@@ -73,10 +213,16 @@ const PrefectureMap: React.FC<PrefectureMapProps> = ({ features }) => {
       const prefectureId = feature.properties?.id;
 
       if (prefectureId && japanPrefectureIds.includes(prefectureId)) {
-        navigate(`/prefecture/${prefectureId}`);
+        // 都道府県データを取得してモーダルを開く
+        const { places, prefecture } = await fetchPrefectureData(prefectureId);
+        if (prefecture) {
+          setSelectedPrefecture(prefecture);
+          setModalPlaces(places);
+          setIsModalOpen(true);
+        }
       }
     }
-  }, [navigate, japanPrefectureIds]);
+  }, [japanPrefectureIds, fetchPrefectureData]);
 
   // マウスホバー処理
   const handleMouseEnter = useCallback((event: MapMouseEvent) => {
@@ -107,6 +253,14 @@ const PrefectureMap: React.FC<PrefectureMapProps> = ({ features }) => {
     mapRef.current.getCanvas().style.cursor = "";
   }, []);
 
+  // マップの移動・ズーム時の処理
+  const handleMove = useCallback(() => {
+    if (!mapRef.current) return;
+    const zoom = mapRef.current.getZoom();
+    setCurrentZoom(zoom);
+    updateLabelPositions();
+  }, [updateLabelPositions]);
+
   // マップスタイルの設定
   const mapStyle = useMemo(() => ({
     version: 8 as const,
@@ -136,6 +290,8 @@ const PrefectureMap: React.FC<PrefectureMapProps> = ({ features }) => {
         onClick={handleMapClick}
         onMouseMove={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
+        onMove={handleMove}
+        onLoad={handleMapLoad}
         maxBounds={[
           [120.0, 23.0], // 南西角（より広く）
           [148.0, 47.0], // 北東角（北海道の上部と右部により余白を追加）
@@ -162,36 +318,63 @@ const PrefectureMap: React.FC<PrefectureMapProps> = ({ features }) => {
           />
         </Source>
 
+        {/* 都道府県名をHTMLオーバーレイで表示 */}
+        {currentZoom >= 4.5 && labelPositions.map((label) => {
+          if (!label.name) return null;
+
+          const fontSize = Math.max(10, Math.min(18, currentZoom * 2.5));
+
+          return (
+            <div
+              key={label.id}
+              className="absolute pointer-events-none select-none"
+              style={{
+                left: label.x - 50,
+                top: label.y - 10,
+                width: 100,
+                textAlign: 'center',
+                fontSize: `${fontSize}px`,
+                color: '#1f2937',
+                fontWeight: 'bold',
+                textShadow: '1px 1px 2px rgba(255,255,255,0.8), -1px -1px 2px rgba(255,255,255,0.8), 1px -1px 2px rgba(255,255,255,0.8), -1px 1px 2px rgba(255,255,255,0.8)',
+                zIndex: 10,
+              }}
+            >
+              {label.name}
+            </div>
+          );
+        })}
+
         {/* 凡例 */}
-        <div className="absolute bottom-4 left-4 bg-white rounded-lg shadow-lg p-4 z-10">
-          <h3 className="font-semibold text-sm mb-2">訪問進捗</h3>
+        <div className="absolute bottom-4 left-4 bg-white rounded-lg shadow-lg p-4 z-10 border border-gray-200">
+          <h3 className="font-semibold text-sm mb-2 text-gray-900">訪問進捗</h3>
           <div className="space-y-1 text-xs">
             <div className="flex items-center gap-2">
               <div className="w-4 h-4 bg-gray-100 rounded border border-gray-300"></div>
-              <span>未訪問</span>
+              <span className="text-gray-700">未訪問</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="w-4 h-4 bg-yellow-200 rounded"></div>
-              <span>~30%</span>
+              <span className="text-gray-700">~30%</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="w-4 h-4 bg-orange-200 rounded"></div>
-              <span>30-60%</span>
+              <span className="text-gray-700">30-60%</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="w-4 h-4 bg-red-200 rounded"></div>
-              <span>60-90%</span>
+              <span className="text-gray-700">60-90%</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="w-4 h-4 bg-green-500 rounded"></div>
-              <span>90%+</span>
+              <span className="text-gray-700">90%+</span>
             </div>
           </div>
         </div>
 
         {/* ホバー時の情報表示 */}
         {hoveredFeatureId && (
-          <div className="absolute top-4 left-4 bg-white rounded-lg shadow-lg p-3 z-10">
+          <div className="absolute top-4 left-4 bg-white rounded-lg shadow-lg p-3 z-10 border border-gray-200">
             {(() => {
               const feature = japanFeatures.find(f => f.properties?.id === hoveredFeatureId);
               if (!feature) return null;
@@ -199,11 +382,11 @@ const PrefectureMap: React.FC<PrefectureMapProps> = ({ features }) => {
               const { nam_ja, visited, total, progress } = feature.properties || {};
               return (
                 <div className="text-sm">
-                  <h4 className="font-semibold">{nam_ja}</h4>
-                  <p className="text-gray-600">
+                  <h4 className="font-semibold text-gray-900">{nam_ja}</h4>
+                  <p className="text-gray-700">
                     {visited || 0} / {total || 0} 訪問済み
                   </p>
-                  <p className="text-gray-600">
+                  <p className="text-gray-700">
                     進捗: {Math.round((progress || 0) * 100)}%
                   </p>
                 </div>
@@ -212,6 +395,15 @@ const PrefectureMap: React.FC<PrefectureMapProps> = ({ features }) => {
           </div>
         )}
       </Map>
+
+      {/* 都道府県詳細モーダル */}
+      <PrefectureModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        prefecture={selectedPrefecture}
+        places={modalPlaces}
+        onToggleVisit={handleToggleVisit}
+      />
     </div>
   );
 };
