@@ -3,6 +3,7 @@ import type { MapMouseEvent } from 'maplibre-gl';
 import React, {
   useRef,
   useEffect,
+  useLayoutEffect,
   useState,
   useMemo,
   useCallback,
@@ -115,13 +116,16 @@ const PrefectureMap: React.FC<PrefectureMapProps> = ({ features }) => {
     }>
   >([]);
 
-  // ラベル位置を更新する関数
+  // rAF throttling用のref
+  const rafId = useRef<number | null>(null);
+
+  // ラベル位置を更新する関数（メモ化 + early exit）
   const updateLabelPositions = useCallback(() => {
     if (!mapRef.current || !mapLoaded) return;
 
-    const positions = prefectureLabels
+    const map = mapRef.current;
+    const nextPositions = prefectureLabels
       .map(label => {
-        const map = mapRef.current;
         if (!map) return null;
 
         const point = map.project([label.longitude, label.latitude]);
@@ -133,21 +137,56 @@ const PrefectureMap: React.FC<PrefectureMapProps> = ({ features }) => {
         };
       })
       .filter((item): item is NonNullable<typeof item> => item !== null);
-    setLabelPositions(positions);
-  }, [prefectureLabels, mapLoaded]);
+
+    // 値が変わったときだけsetStateを実行（パフォーマンス最適化）
+    setLabelPositions(prev => {
+      if (prev.length !== nextPositions.length) return nextPositions;
+
+      const hasChanged = prev.some((p, i) => {
+        const next = nextPositions[i];
+        return p.x !== next.x || p.y !== next.y || p.id !== next.id;
+      });
+
+      return hasChanged ? nextPositions : prev;
+    });
+  }, [mapLoaded, prefectureLabels]);
+
+  // rAFベースのthrottle処理（1フレームにつき1回）
+  const queueLabelUpdate = useCallback(() => {
+    if (rafId.current === null) {
+      rafId.current = requestAnimationFrame(() => {
+        updateLabelPositions();
+        rafId.current = null;
+      });
+    }
+  }, [updateLabelPositions]);
 
   // マップが読み込まれた時の処理
   const handleMapLoad = useCallback(() => {
     setMapLoaded(true);
-    updateLabelPositions();
-  }, [updateLabelPositions]);
+    queueLabelUpdate();
+  }, [queueLabelUpdate]);
 
   // 初期化時とデータ変更時にラベル位置を更新
   useEffect(() => {
     if (mapLoaded) {
-      updateLabelPositions();
+      queueLabelUpdate();
     }
-  }, [mapLoaded, updateLabelPositions]);
+  }, [mapLoaded, queueLabelUpdate]);
+
+  // ブラウザリサイズ時にもラベル位置を再計算
+  useLayoutEffect(() => {
+    const handleResize = () => queueLabelUpdate();
+    window.addEventListener('resize', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      // コンポーネントアンマウント時にrAFをクリーンアップ
+      if (rafId.current) {
+        cancelAnimationFrame(rafId.current);
+        rafId.current = null;
+      }
+    };
+  }, [queueLabelUpdate]);
 
   // GeoJSONコレクションを作成
   const geoJsonData: FeatureCollection = useMemo(
@@ -265,13 +304,13 @@ const PrefectureMap: React.FC<PrefectureMapProps> = ({ features }) => {
     mapRef.current.getCanvas().style.cursor = '';
   }, []);
 
-  // マップの移動・ズーム時の処理
+  // マップの移動・ズーム時の処理（throttled）
   const handleMove = useCallback(() => {
     if (!mapRef.current) return;
     const zoom = mapRef.current.getZoom();
     setCurrentZoom(zoom);
-    updateLabelPositions();
-  }, [updateLabelPositions]);
+    queueLabelUpdate(); // throttledな更新
+  }, [queueLabelUpdate]);
 
   // マップスタイルの設定
   const mapStyle = useMemo(
