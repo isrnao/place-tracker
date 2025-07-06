@@ -6,6 +6,7 @@ import {
   supabase,
   type CategorySlug,
 } from '~/api/supabase.server';
+import { redirect } from 'react-router';
 
 import type { Route } from './+types/prefecture-data';
 
@@ -25,6 +26,11 @@ async function fetchPlacesAndProgress(
 
 export async function loader({ request }: Route.LoaderArgs) {
   const userId = await getUser(request);
+
+  if (!userId) {
+    throw redirect('/login');
+  }
+
   const url = new URL(request.url);
   const prefectureId = Number(url.searchParams.get('id'));
   const categorySlug = url.searchParams.get('category') as CategorySlug | null;
@@ -41,27 +47,38 @@ export async function loader({ request }: Route.LoaderArgs) {
 
 export async function action({ request }: Route.ActionArgs) {
   const userId = await getUser(request);
+  console.log('Action called - userId:', userId);
+
   if (!userId) {
-    throw new Response('Unauthorized', { status: 401 });
+    throw redirect('/login');
   }
+
   const formData = await request.formData();
   const placeId = formData.get('placeId') as string;
   const visited = formData.get('visited') === 'true';
 
+  console.log('Toggle visit - placeId:', placeId, 'visited:', visited);
+
   try {
     if (visited) {
-      await supabase
+      console.log('Deleting visit record');
+      const result = await supabase
         .from('visits')
         .delete()
         .eq('user_id', userId)
         .eq('place_id', placeId);
+      console.log('Delete result:', result);
     } else {
-      await supabase
+      console.log('Inserting visit record');
+      const result = await supabase
         .from('visits')
         .insert({ user_id: userId, place_id: placeId });
+      console.log('Insert result:', result);
     }
+    console.log('Visit toggle successful');
     return { ok: true };
   } catch (err) {
+    console.error('Error toggling visit:', err);
     return { ok: false, error: err };
   }
 }

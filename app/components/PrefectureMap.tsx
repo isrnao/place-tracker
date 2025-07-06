@@ -234,7 +234,11 @@ const PrefectureMap: React.FC<PrefectureMapProps> = ({
   const handleToggleVisit = useCallback(
     async (placeId: number, visited: boolean) => {
       try {
-        updateOptimistic({ id: placeId, visited });
+        // Optimistic updateをstartTransitionでラップ
+        startTransition(() => {
+          updateOptimistic({ id: placeId, visited });
+        });
+
         const formData = new FormData();
         formData.append('placeId', placeId.toString());
         formData.append('visited', visited.toString());

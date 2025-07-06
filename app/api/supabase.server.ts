@@ -8,15 +8,21 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
 });
 
 export async function getUser(request: Request): Promise<string | null> {
-  let token = request.headers.get('authorization')?.replace('Bearer ', '') || '';
-  if (!token) {
-    const cookieHeader = request.headers.get('cookie') ?? '';
-    const match = cookieHeader.match(/sb-access-token=([^;]+)/);
-    if (match) token = match[1];
+  try {
+    let token =
+      request.headers.get('authorization')?.replace('Bearer ', '') || '';
+    if (!token) {
+      const cookieHeader = request.headers.get('cookie') ?? '';
+      const match = cookieHeader.match(/sb-access-token=([^;]+)/);
+      if (match) token = match[1];
+    }
+    if (!token) return null;
+    const { data } = await supabase.auth.getUser(token);
+    return data.user?.id ?? null;
+  } catch (error) {
+    console.error('Error getting user:', error);
+    return null;
   }
-  if (!token) return null;
-  const { data } = await supabase.auth.getUser(token);
-  return data.user?.id ?? null;
 }
 
 export interface Category {

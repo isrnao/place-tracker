@@ -1,5 +1,6 @@
 import { readFile } from 'fs/promises';
 import { resolve } from 'path';
+import { redirect } from 'react-router';
 
 import type { FeatureCollection } from 'geojson';
 import { useLoaderData } from 'react-router';
@@ -25,6 +26,11 @@ export function meta(_: Route.MetaArgs) {
 
 export async function loader({ request }: Route.LoaderArgs) {
   const userId = await getUser(request);
+
+  if (!userId) {
+    throw redirect('/login');
+  }
+
   try {
     // ❶ progress 集計
     const progress = await fetchPrefectureProgress(userId);
@@ -40,7 +46,8 @@ export async function loader({ request }: Route.LoaderArgs) {
     );
 
     return { features };
-  } catch {
+  } catch (error) {
+    console.error('Error in loader:', error);
     throw new Response('Failed to load prefecture data', { status: 500 });
   }
 }

@@ -10,6 +10,7 @@ import {
 } from 'react-router';
 
 import { supabase } from '~/api/supabaseClient';
+import { AuthProvider } from '~/contexts/AuthContext';
 
 import type { Route } from './+types/root';
 import './app.css';
@@ -61,9 +62,12 @@ export default function App() {
     });
     return () => subscription.unsubscribe();
   }, []);
+  
   return (
     <QueryClientProvider client={queryClient}>
-      <Outlet />
+      <AuthProvider>
+        <Outlet />
+      </AuthProvider>
     </QueryClientProvider>
   );
 }

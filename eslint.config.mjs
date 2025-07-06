@@ -18,6 +18,7 @@ export default [
       'node_modules/**',
       'public/**',
       '.react-router/**',
+      '**/\\.well-known.*',
     ],
   },
 
