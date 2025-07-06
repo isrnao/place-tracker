@@ -113,9 +113,7 @@ const PrefectureModal: React.FC<PrefectureModalProps> = ({
                   <Button
                     variant={place.visited ? 'destructive' : 'default'}
                     size='sm'
-                    onClick={() => {
-                      onToggleVisit(place.id, place.visited);
-                    }}
+                    onClick={() => onToggleVisit(place.id, place.visited)}
                     className='text-xs'
                   >
                     {place.visited ? '✅ 解除' : '✅ 訪問'}

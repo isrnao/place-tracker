@@ -50,7 +50,7 @@ const PrefectureListSidebar: React.FC<PrefectureListSidebarProps> = ({
     try {
       await signOut();
       navigate('/login', { replace: true });
-    } catch (error) {
+    } catch {
       // エラーが発生した場合でもログイン画面にリダイレクト
       navigate('/login', { replace: true });
     }

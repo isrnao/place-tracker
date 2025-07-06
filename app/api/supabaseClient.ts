@@ -25,7 +25,7 @@ export async function getCurrentUser() {
 export async function signOut() {
   try {
     await supabase.auth.signOut();
-  } catch (error) {
+  } catch {
     // エラーが発生してもログアウト処理を続行
   }
   // ローカルストレージをクリア

@@ -47,10 +47,7 @@ function createRenderStream(
   readyEventName: 'onAllReady' | 'onShellReady'
 ) {
   return new Promise((resolve, reject) => {
-    let _shellRendered = false;
-
     const handleReady = () => {
-      _shellRendered = true;
       const body = new PassThrough();
       const stream = createReadableStreamFromReadable(body);
 
