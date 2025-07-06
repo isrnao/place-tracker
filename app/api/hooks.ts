@@ -2,11 +2,12 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from './supabaseClient';
 import { getCurrentUser } from './supabaseClient';
 
+export function useCurrentUser() {
+  return useQuery({ queryKey: ['user'], queryFn: getCurrentUser });
+}
+
 export function usePrefectures() {
-  const { data: userId } = useQuery({
-    queryKey: ['user'],
-    queryFn: getCurrentUser,
-  });
+  const { data: userId } = useCurrentUser();
   return useQuery({
     queryKey: ['prefectures', userId],
     queryFn: () => supabase.rpc('prefecture_progress', { p_user_id: userId }),
@@ -15,10 +16,7 @@ export function usePrefectures() {
 }
 
 export function useToggleVisit() {
-  const { data: userId } = useQuery({
-    queryKey: ['user'],
-    queryFn: getCurrentUser,
-  });
+  const { data: userId } = useCurrentUser();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({
