@@ -8,7 +8,6 @@ import React, {
   useMemo,
   useCallback,
   startTransition,
-  useOptimistic,
 } from 'react';
 import { Map, Source, Layer } from 'react-map-gl/maplibre';
 import type { MapRef } from 'react-map-gl/maplibre';
@@ -55,11 +54,13 @@ const calculateCentroid = (feature: Feature): [number, number] => {
 interface PrefectureMapProps {
   features: Feature[];
   categorySlug?: string;
+  onDataUpdate?: () => void; // データ更新時のコールバック
 }
 
 const PrefectureMap: React.FC<PrefectureMapProps> = ({
   features,
   categorySlug,
+  onDataUpdate,
 }) => {
   const mapRef = useRef<MapRef>(null);
   const [hoveredFeatureId, setHoveredFeatureId] = useState<
@@ -81,13 +82,41 @@ const PrefectureMap: React.FC<PrefectureMapProps> = ({
     name: string;
     visited: boolean;
   }> | null>(null);
-  const [optimisticPlaces, updateOptimistic] = useOptimistic(
-    modalPlaces,
-    (state, update: { id: number; visited: boolean }) =>
-      state?.map(p =>
-        p.id === update.id ? { ...p, visited: !update.visited } : p
-      ) || state
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // カスタム楽観的更新の実装
+  const [optimisticUpdates, setOptimisticUpdates] = useState<
+    Record<number, boolean>
+  >({});
+
+  // 楽観的更新を適用したplaces
+  const optimisticPlaces = useMemo(() => {
+    if (!modalPlaces) return [];
+
+    return modalPlaces.map(place => {
+      const optimisticValue = optimisticUpdates[place.id];
+      if (optimisticValue !== undefined) {
+        return { ...place, visited: optimisticValue };
+      }
+      return place;
+    });
+  }, [modalPlaces, optimisticUpdates]);
+
+  // 楽観的更新を追加する関数
+  const addOptimisticUpdate = useCallback(
+    (placeId: number, visited: boolean) => {
+      setOptimisticUpdates(prev => ({
+        ...prev,
+        [placeId]: visited,
+      }));
+    },
+    []
   );
+
+  // 楽観的更新をクリアする関数
+  const clearOptimisticUpdates = useCallback(() => {
+    setOptimisticUpdates({});
+  }, []);
 
   // 日本の都道府県のIDリスト（1-47）
   const japanPrefectureIds = useMemo(
@@ -218,27 +247,28 @@ const PrefectureMap: React.FC<PrefectureMapProps> = ({
       try {
         const params = new URLSearchParams({ id: String(prefectureId) });
         if (categorySlug) params.set('category', categorySlug);
-        const response = await fetch(`/prefecture-data?${params.toString()}`);
+        const url = `/prefecture-data?${params.toString()}`;
+
+        const response = await fetch(url);
+
         if (!response.ok) throw new Error('Failed to fetch');
+
         const data = await response.json();
         return data;
-      } catch (err) {
-        console.error('Error fetching prefecture data:', err);
+      } catch {
         return { places: [], prefecture: null };
       }
     },
     [categorySlug]
-  );
-
-  // 訪問状態を切り替える関数
+  ); // 訪問状態を切り替える関数
   const handleToggleVisit = useCallback(
     async (placeId: number, visited: boolean) => {
-      try {
-        // Optimistic updateをstartTransitionでラップ
-        startTransition(() => {
-          updateOptimistic({ id: placeId, visited });
-        });
+      if (!selectedPrefecture) return;
 
+      // 楽観的更新を即座に適用
+      addOptimisticUpdate(placeId, !visited);
+
+      try {
         const formData = new FormData();
         formData.append('placeId', placeId.toString());
         formData.append('visited', visited.toString());
@@ -252,27 +282,64 @@ const PrefectureMap: React.FC<PrefectureMapProps> = ({
         const response = await fetch(url, {
           method: 'POST',
           body: formData,
+          credentials: 'include',
         });
 
-        if (!response.ok) throw new Error('Failed to toggle visit');
-
-        // データを再取得してモーダルを更新
-        if (selectedPrefecture) {
-          const { places, prefecture } = await fetchPrefectureData(
-            selectedPrefecture.id
-          );
-          startTransition(() => {
-            setModalPlaces(places);
-            if (prefecture) {
-              setSelectedPrefecture(prefecture);
-            }
-          });
+        if (!response.ok) {
+          throw new Error(`Failed to toggle visit: ${response.status}`);
         }
+
+        const responseData = await response.json();
+        if (!responseData.ok) {
+          throw new Error(responseData.error?.message || 'Unknown error');
+        }
+
+        setErrorMessage(null);
+
+        // 成功時は最新データを取得してベース状態を更新
+        const { places, prefecture } = await fetchPrefectureData(
+          selectedPrefecture.id
+        );
+
+        // ベース状態を更新すると、楽観的更新を自動的に解除
+        startTransition(() => {
+          setModalPlaces(places);
+          if (prefecture) {
+            setSelectedPrefecture(prefecture);
+          }
+          // 楽観的更新をクリア
+          clearOptimisticUpdates();
+          // 親コンポーネントに変更を通知
+          onDataUpdate?.();
+        });
       } catch (err) {
-        console.error('Error toggling visit:', err);
+        const errorMessage =
+          err instanceof Error ? err.message : 'Unknown error occurred';
+        setErrorMessage(errorMessage);
+
+        // エラーの場合は最新データで状態を復元
+        const { places, prefecture } = await fetchPrefectureData(
+          selectedPrefecture.id
+        );
+
+        startTransition(() => {
+          setModalPlaces(places);
+          if (prefecture) {
+            setSelectedPrefecture(prefecture);
+          }
+          // 楽観的更新をクリア
+          clearOptimisticUpdates();
+        });
       }
     },
-    [selectedPrefecture, fetchPrefectureData, categorySlug, updateOptimistic]
+    [
+      selectedPrefecture,
+      fetchPrefectureData,
+      categorySlug,
+      addOptimisticUpdate,
+      clearOptimisticUpdates,
+      onDataUpdate,
+    ]
   );
 
   // マップクリック処理
@@ -293,11 +360,9 @@ const PrefectureMap: React.FC<PrefectureMapProps> = ({
           const { places, prefecture } =
             await fetchPrefectureData(prefectureId);
           if (prefecture) {
-            startTransition(() => {
-              setSelectedPrefecture(prefecture);
-              setModalPlaces(places);
-              setIsModalOpen(true);
-            });
+            setSelectedPrefecture(prefecture);
+            setModalPlaces(places);
+            setIsModalOpen(true);
           }
         }
       }
@@ -368,11 +433,9 @@ const PrefectureMap: React.FC<PrefectureMapProps> = ({
     async (prefectureId: number) => {
       const { places, prefecture } = await fetchPrefectureData(prefectureId);
       if (prefecture) {
-        startTransition(() => {
-          setSelectedPrefecture(prefecture);
-          setModalPlaces(places);
-          setIsModalOpen(true);
-        });
+        setSelectedPrefecture(prefecture);
+        setModalPlaces(places);
+        setIsModalOpen(true);
       }
     },
     [fetchPrefectureData]
@@ -540,10 +603,14 @@ const PrefectureMap: React.FC<PrefectureMapProps> = ({
       {/* 都道府県詳細モーダル */}
       <PrefectureModal
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        onClose={() => {
+          setIsModalOpen(false);
+          setErrorMessage(null); // モーダルを閉じるときにエラーメッセージをクリア
+        }}
         prefecture={selectedPrefecture}
         places={optimisticPlaces}
         onToggleVisit={handleToggleVisit}
+        errorMessage={errorMessage}
       />
     </div>
   );

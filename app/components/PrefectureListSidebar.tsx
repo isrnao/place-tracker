@@ -1,4 +1,4 @@
-import { Link } from 'react-router';
+import { Link, useNavigate } from 'react-router';
 
 import { useCurrentUser } from '~/api/hooks';
 import { signOut } from '~/api/supabaseClient';
@@ -44,6 +44,17 @@ const PrefectureListSidebar: React.FC<PrefectureListSidebarProps> = ({
   selectedPrefectureId,
 }) => {
   const { data: userId } = useCurrentUser();
+  const navigate = useNavigate();
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      navigate('/login', { replace: true });
+    } catch (error) {
+      // エラーが発生した場合でもログイン画面にリダイレクト
+      navigate('/login', { replace: true });
+    }
+  };
   const getProgressColor = (progress: number) => {
     if (progress === 0) return 'bg-gray-200';
     if (progress < 0.3) return 'bg-yellow-500';
@@ -97,7 +108,7 @@ const PrefectureListSidebar: React.FC<PrefectureListSidebarProps> = ({
         <div className='mt-2'>
           {userId ? (
             <button
-              onClick={() => signOut()}
+              onClick={handleSignOut}
               className='text-primary text-xs underline'
             >
               Logout

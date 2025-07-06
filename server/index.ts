@@ -17,6 +17,4 @@ app.all(
 
 const PORT = process.env.PORT || 5174;
 
-app.listen(PORT, () => {
-  console.log(`SSR server listening on http://localhost:${PORT}`);
-});
+app.listen(PORT, () => {});

@@ -62,7 +62,7 @@ export default function App() {
     });
     return () => subscription.unsubscribe();
   }, []);
-  
+
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>

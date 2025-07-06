@@ -1,11 +1,14 @@
 import { readFile } from 'fs/promises';
 import { resolve } from 'path';
-import { redirect } from 'react-router';
 
 import type { FeatureCollection } from 'geojson';
-import { useLoaderData } from 'react-router';
+import { redirect, useLoaderData } from 'react-router';
 
-import { fetchPrefectureProgress, getUser } from '~/api/supabase.server';
+import {
+  fetchPrefectureProgress,
+  getUser,
+  createAuthenticatedSupabaseClient,
+} from '~/api/supabase.server';
 import PrefectureListSidebar from '~/components/PrefectureListSidebar';
 import PrefectureMap from '~/components/PrefectureMap';
 import {
@@ -32,8 +35,16 @@ export async function loader({ request }: Route.LoaderArgs) {
   }
 
   try {
-    // ❶ progress 集計
-    const progress = await fetchPrefectureProgress(userId);
+    // 認証されたSupabaseクライアントを作成
+    const authenticatedSupabase =
+      await createAuthenticatedSupabaseClient(request);
+
+    // ❶ progress 集計（認証されたクライアントを使用）
+    const progress = await fetchPrefectureProgress(
+      userId,
+      undefined,
+      authenticatedSupabase
+    );
 
     // ❂ GeoJSON ファイル (public/) を読み込む
     const geoJsonPath = resolve('public/japan-prefectures.geojson');
@@ -46,8 +57,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     );
 
     return { features };
-  } catch (error) {
-    console.error('Error in loader:', error);
+  } catch {
     throw new Response('Failed to load prefecture data', { status: 500 });
   }
 }

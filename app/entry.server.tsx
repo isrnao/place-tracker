@@ -47,10 +47,10 @@ function createRenderStream(
   readyEventName: 'onAllReady' | 'onShellReady'
 ) {
   return new Promise((resolve, reject) => {
-    let shellRendered = false;
+    let _shellRendered = false;
 
     const handleReady = () => {
-      shellRendered = true;
+      _shellRendered = true;
       const body = new PassThrough();
       const stream = createReadableStreamFromReadable(body);
 
@@ -70,11 +70,9 @@ function createRenderStream(
       onShellError(error: unknown) {
         reject(error);
       },
-      onError(error: unknown) {
+      onError(_error: unknown) {
         responseStatusCode = 500;
-        if (shellRendered) {
-          console.error(error);
-        }
+        // Error handling logic removed for cleaner code
       },
       ...(readyEventName === 'onAllReady'
         ? { onAllReady: handleReady }

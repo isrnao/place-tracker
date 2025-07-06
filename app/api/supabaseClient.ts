@@ -23,5 +23,14 @@ export async function getCurrentUser() {
 }
 
 export async function signOut() {
-  await supabase.auth.signOut();
+  try {
+    await supabase.auth.signOut();
+  } catch (error) {
+    // エラーが発生してもログアウト処理を続行
+  }
+  // ローカルストレージをクリア
+  localStorage.clear();
+  sessionStorage.clear();
+  // ログアウト後にログイン画面にリダイレクト
+  window.location.href = '/login';
 }

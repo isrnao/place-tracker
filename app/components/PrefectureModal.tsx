@@ -4,6 +4,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from '~/components/ui/dialog';
 
 interface PrefectureModalProps {
@@ -21,6 +22,7 @@ interface PrefectureModalProps {
     visited: boolean;
   }> | null;
   onToggleVisit: (placeId: number, visited: boolean) => void;
+  errorMessage?: string | null;
 }
 
 const PrefectureModal: React.FC<PrefectureModalProps> = ({
@@ -29,6 +31,7 @@ const PrefectureModal: React.FC<PrefectureModalProps> = ({
   prefecture,
   places,
   onToggleVisit,
+  errorMessage,
 }) => {
   if (!prefecture) return null;
 
@@ -42,9 +45,31 @@ const PrefectureModal: React.FC<PrefectureModalProps> = ({
           <DialogTitle className='text-center text-2xl font-bold'>
             {prefecture.name}
           </DialogTitle>
+          <DialogDescription className='text-center text-gray-600'>
+            {prefecture.name}の観光スポットや名所を管理できます。
+          </DialogDescription>
         </DialogHeader>
 
         <div className='space-y-6'>
+          {/* エラーメッセージ表示 */}
+          {errorMessage && (
+            <div className='rounded-md border border-red-200 bg-red-50 p-4'>
+              <div className='flex'>
+                <div className='flex-shrink-0'>
+                  <span className='text-red-400'>⚠️</span>
+                </div>
+                <div className='ml-3'>
+                  <h3 className='text-sm font-medium text-red-800'>
+                    エラーが発生しました
+                  </h3>
+                  <div className='mt-2 text-sm text-red-700'>
+                    {errorMessage}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* 進捗情報 */}
           <div className='text-center'>
             <p className='mb-4 text-lg text-gray-600'>
@@ -88,7 +113,9 @@ const PrefectureModal: React.FC<PrefectureModalProps> = ({
                   <Button
                     variant={place.visited ? 'destructive' : 'default'}
                     size='sm'
-                    onClick={() => onToggleVisit(place.id, place.visited)}
+                    onClick={() => {
+                      onToggleVisit(place.id, place.visited);
+                    }}
                     className='text-xs'
                   >
                     {place.visited ? '✅ 解除' : '✅ 訪問'}

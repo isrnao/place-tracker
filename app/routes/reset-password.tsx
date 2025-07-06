@@ -1,13 +1,20 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
+
 import { supabase } from '~/api/supabaseClient';
 import { Button } from '~/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '~/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '~/components/ui/card';
 
 export const meta = () => [{ title: 'パスワードリセット - Place Tracker' }];
 
 export default function ResetPassword() {
-  const [searchParams] = useSearchParams();
+  const [_searchParams] = useSearchParams();
   const navigate = useNavigate();
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -58,7 +65,7 @@ export default function ResetPassword() {
           navigate('/', { replace: true });
         }, 2000);
       }
-    } catch (error: any) {
+    } catch {
       setError('エラーが発生しました。後ほど再試行してください。');
     } finally {
       setIsLoading(false);
@@ -76,72 +83,72 @@ export default function ResetPassword() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <Card className="w-full max-w-md">
+    <div className='flex min-h-screen items-center justify-center bg-gray-50 px-4 py-12 sm:px-6 lg:px-8'>
+      <Card className='w-full max-w-md'>
         <CardHeader>
           <CardTitle>新しいパスワードを設定</CardTitle>
-          <CardDescription>
-            新しいパスワードを入力してください
-          </CardDescription>
+          <CardDescription>新しいパスワードを入力してください</CardDescription>
         </CardHeader>
         <CardContent>
           {message && (
-            <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-md">
-              <p className="text-sm text-green-800">{message}</p>
-            </div>
-          )}
-          
-          {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
-              <p className="text-sm text-red-800">{error}</p>
+            <div className='mb-4 rounded-md border border-green-200 bg-green-50 p-3'>
+              <p className='text-sm text-green-800'>{message}</p>
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+          {error && (
+            <div className='mb-4 rounded-md border border-red-200 bg-red-50 p-3'>
+              <p className='text-sm text-red-800'>{error}</p>
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} className='space-y-4'>
             <div>
-              <label htmlFor="password" className="block text-sm font-medium mb-1">
+              <label
+                htmlFor='password'
+                className='mb-1 block text-sm font-medium'
+              >
                 新しいパスワード
               </label>
               <input
-                id="password"
-                type="password"
+                id='password'
+                type='password'
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={e => setPassword(e.target.value)}
                 required
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="6文字以上のパスワード"
-              />
-            </div>
-            
-            <div>
-              <label htmlFor="confirmPassword" className="block text-sm font-medium mb-1">
-                パスワード確認
-              </label>
-              <input
-                id="confirmPassword"
-                type="password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                required
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="パスワードを再入力"
+                className='w-full rounded-md border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none'
+                placeholder='6文字以上のパスワード'
               />
             </div>
 
-            <Button
-              type="submit"
-              disabled={isLoading}
-              className="w-full"
-            >
+            <div>
+              <label
+                htmlFor='confirmPassword'
+                className='mb-1 block text-sm font-medium'
+              >
+                パスワード確認
+              </label>
+              <input
+                id='confirmPassword'
+                type='password'
+                value={confirmPassword}
+                onChange={e => setConfirmPassword(e.target.value)}
+                required
+                className='w-full rounded-md border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none'
+                placeholder='パスワードを再入力'
+              />
+            </div>
+
+            <Button type='submit' disabled={isLoading} className='w-full'>
               {isLoading ? '更新中...' : 'パスワードを更新'}
             </Button>
           </form>
 
-          <div className="mt-4 text-center">
+          <div className='mt-4 text-center'>
             <Button
-              variant="outline"
+              variant='outline'
               onClick={() => navigate('/login')}
-              className="text-sm"
+              className='text-sm'
             >
               ログインページに戻る
             </Button>
