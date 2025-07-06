@@ -41,6 +41,9 @@ export async function loader({ request }: Route.LoaderArgs) {
 
 export async function action({ request }: Route.ActionArgs) {
   const userId = await getUser(request);
+  if (!userId) {
+    throw new Response('Unauthorized', { status: 401 });
+  }
   const formData = await request.formData();
   const placeId = formData.get('placeId') as string;
   const visited = formData.get('visited') === 'true';

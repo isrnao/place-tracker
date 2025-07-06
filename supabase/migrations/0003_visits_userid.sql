@@ -9,7 +9,8 @@ create table visits (
 );
 
 insert into visits (user_id, place_id, visited_at)
-select null::uuid, place_id, now() from visits_old;
+select coalesce(user_id, '00000000-0000-0000-0000-000000000000'::uuid), place_id, now()
+from visits_old;
 
 drop table visits_old;
 

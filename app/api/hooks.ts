@@ -37,6 +37,8 @@ export function useToggleVisit() {
         .from('visits')
         .insert({ user_id: userId, place_id: placeId });
     },
-    onSuccess: () => qc.invalidateQueries(),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['prefectures', userId] });
+    },
   });
 }
