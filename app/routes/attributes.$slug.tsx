@@ -12,7 +12,6 @@ import {
   createAuthenticatedSupabaseClient,
   type CategorySlug,
 } from '~/api/supabase.server';
-import PrefectureListSidebar from '~/components/PrefectureListSidebar';
 import PrefectureMap from '~/components/PrefectureMap';
 import {
   mergeProgressWithGeoJSON,
@@ -76,39 +75,14 @@ export default function Home() {
     revalidator.revalidate();
   }, [revalidator]);
 
-  // 都道府県リスト用のデータを準備
-  interface PrefectureProperties {
-    id: number;
-    nam_ja: string;
-    visited: number;
-    total: number;
-    progress: number;
-  }
-
-  const prefectureList = features
-    .filter(f => f.properties?.id && f.properties?.nam_ja)
-    .map(f => {
-      const props = f.properties as PrefectureProperties;
-      return {
-        id: props.id,
-        name: props.nam_ja,
-        visited: props.visited || 0,
-        total: props.total || 0,
-        progress: props.progress || 0,
-      };
-    })
-    .sort((a, b) => a.id - b.id);
-
   return (
     <main className='relative flex h-screen'>
-      {/* 左サイドバー - 都道府県リスト */}
-      <PrefectureListSidebar prefectures={prefectureList} />
-
-      {/* 右側 - マップ */}
+      {/* メインコンテンツ - マップ */}
       <div className='relative flex-1'>
         <PrefectureMap
           features={features}
           categorySlug={category.slug}
+          categoryName={category.name}
           onDataUpdate={handleDataUpdate}
         />
       </div>

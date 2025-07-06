@@ -3,10 +3,10 @@ import { redirect } from 'react-router';
 
 import {
   fetchPlacesWithVisit,
-  fetchPrefectureProgress,
   fetchCategoryBySlug,
   getUser,
   createAuthenticatedSupabaseClient,
+  supabase,
   type CategorySlug,
 } from '~/api/supabase.server';
 
@@ -19,20 +19,38 @@ async function fetchPlacesAndProgress(
   categoryId?: number,
   authenticatedClient?: SupabaseClient | null
 ) {
+  // 場所データを取得
   const places = await fetchPlacesWithVisit(
     userId,
     prefectureId,
     categoryId,
     authenticatedClient
   );
-  const progress = await fetchPrefectureProgress(
-    userId,
-    categoryId,
-    authenticatedClient
-  );
+
+  // 特定の都道府県の進捗のみを計算（全都道府県を取得しない）
+  const client = authenticatedClient || supabase;
+  const { data: prefectureData, error } = await client
+    .from('prefectures')
+    .select('id, name')
+    .eq('id', prefectureId)
+    .single();
+
+  if (error) throw error;
+
+  // 場所データから進捗を直接計算
+  const visited = places.filter(p => p.visited).length;
+  const total = places.length;
+
+  const prefecture = {
+    id: prefectureData.id,
+    name: prefectureData.name,
+    visited,
+    total,
+  };
+
   return {
     places,
-    prefecture: progress.find(p => p.id === prefectureId),
+    prefecture,
   };
 }
 
