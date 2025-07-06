@@ -2,6 +2,7 @@ import { readFile } from 'fs/promises';
 import { resolve } from 'path';
 
 import type { FeatureCollection } from 'geojson';
+import { useCallback } from 'react';
 import { redirect, useLoaderData, useRevalidator } from 'react-router';
 
 import {
@@ -66,9 +67,9 @@ export default function Home() {
   const { features } = useLoaderData<typeof loader>();
   const revalidator = useRevalidator();
 
-  const handleDataUpdate = () => {
+  const handleDataUpdate = useCallback(() => {
     revalidator.revalidate();
-  };
+  }, [revalidator]);
 
   // 都道府県リスト用のデータを準備
   interface PrefectureProperties {
