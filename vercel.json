@@ -1,24 +1,22 @@
 {
+  "$schema": "https://openapi.vercel.sh/vercel.json",
   "version": 2,
+  "framework": "react-router",
+  "buildCommand": "pnpm run build",
+  "devCommand": "pnpm run dev",
+  "installCommand": "pnpm install",
+  "outputDirectory": "build/client",
   "functions": {
-    "api/ssr.js": {
-      "runtime": "nodejs20.x"
+    "build/server/**/*.js": {
+      "runtime": "nodejs20.x",
+      "memory": 256,
+      "maxDuration": 30
     }
   },
   "rewrites": [
     {
-      "source": "/assets/(.*)",
-      "destination": "/build/client/assets/$1"
-    },
-    {
-      "source": "/favicon.ico",
-      "destination": "/build/client/favicon.ico"
-    },
-    {
       "source": "/(.*)",
-      "destination": "/api/ssr.js"
+      "destination": "/api/__react-router"
     }
-  ],
-  "installCommand": "pnpm install",
-  "buildCommand": "pnpm run build"
+  ]
 }
