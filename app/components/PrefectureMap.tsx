@@ -12,7 +12,10 @@ import React, {
 import { Map, Source, Layer } from 'react-map-gl/maplibre';
 import type { MapRef } from 'react-map-gl/maplibre';
 
+import HoverInfo from './HoverInfo';
+import MapHeader from './MapHeader';
 import PrefectureModal from './PrefectureModal';
+import SidebarContent from './SidebarContent';
 
 // 都道府県の中心座標を計算する関数
 const calculateCentroid = (feature: Feature): [number, number] => {
@@ -54,18 +57,25 @@ const calculateCentroid = (feature: Feature): [number, number] => {
 interface PrefectureMapProps {
   features: Feature[];
   categorySlug?: string;
+  categoryName?: string;
   onDataUpdate?: () => void; // データ更新時のコールバック
 }
 
-const PrefectureMap: React.FC<PrefectureMapProps> = ({
+function PrefectureMap({
   features,
   categorySlug,
+  categoryName,
   onDataUpdate,
-}) => {
+}: PrefectureMapProps) {
   const mapRef = useRef<MapRef>(null);
   const [hoveredFeatureId, setHoveredFeatureId] = useState<
     string | number | null
   >(null);
+  const [hoveredFeature, setHoveredFeature] = useState<Feature | null>(null);
+  const [mousePosition, setMousePosition] = useState<{ x: number; y: number }>({
+    x: 0,
+    y: 0,
+  });
   const [currentZoom, setCurrentZoom] = useState(5.2);
   const [mapLoaded, setMapLoaded] = useState(false);
 
@@ -83,6 +93,7 @@ const PrefectureMap: React.FC<PrefectureMapProps> = ({
     visited: boolean;
   }> | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isModalLoading, setIsModalLoading] = useState(false);
 
   // カスタム楽観的更新の実装
   const [optimisticUpdates, setOptimisticUpdates] = useState<
@@ -249,14 +260,33 @@ const PrefectureMap: React.FC<PrefectureMapProps> = ({
         if (categorySlug) params.set('category', categorySlug);
         const url = `/prefecture-data?${params.toString()}`;
 
-        const response = await fetch(url);
+        // AbortControllerを使用してタイムアウトを実装
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10秒でタイムアウト
 
-        if (!response.ok) throw new Error('Failed to fetch');
+        const response = await fetch(url, {
+          signal: controller.signal,
+          credentials: 'include',
+        });
+
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+          throw new Error(`サーバーエラー: ${response.status}`);
+        }
 
         const data = await response.json();
         return data;
-      } catch {
-        return { places: [], prefecture: null };
+      } catch (error) {
+        if (error instanceof Error) {
+          if (error.name === 'AbortError') {
+            throw new Error(
+              'リクエストがタイムアウトしました。再度お試しください。'
+            );
+          }
+          throw error;
+        }
+        throw new Error('データの取得に失敗しました');
       }
     },
     [categorySlug]
@@ -354,15 +384,38 @@ const PrefectureMap: React.FC<PrefectureMapProps> = ({
       if (features.length > 0) {
         const feature = features[0];
         const prefectureId = feature.properties?.id;
+        const prefectureName = feature.properties?.nam_ja;
 
         if (prefectureId && japanPrefectureIds.includes(prefectureId)) {
-          // 都道府県データを取得してモーダルを開く
-          const { places, prefecture } =
-            await fetchPrefectureData(prefectureId);
-          if (prefecture) {
-            setSelectedPrefecture(prefecture);
-            setModalPlaces(places);
-            setIsModalOpen(true);
+          // 即座にモーダルを開く（ローディング状態で）
+          setSelectedPrefecture({
+            id: prefectureId,
+            name: prefectureName || '',
+            visited: feature.properties?.visited || 0,
+            total: feature.properties?.total || 0,
+          });
+          setModalPlaces(null); // 初期化
+          setIsModalLoading(true);
+          setIsModalOpen(true);
+          setErrorMessage(null);
+
+          try {
+            // 非同期でデータを取得
+            const { places, prefecture } =
+              await fetchPrefectureData(prefectureId);
+
+            if (prefecture) {
+              setSelectedPrefecture(prefecture);
+              setModalPlaces(places);
+            }
+          } catch (error) {
+            const errorMessage =
+              error instanceof Error
+                ? error.message
+                : 'データの取得に失敗しました';
+            setErrorMessage(errorMessage);
+          } finally {
+            setIsModalLoading(false);
           }
         }
       }
@@ -385,10 +438,13 @@ const PrefectureMap: React.FC<PrefectureMapProps> = ({
 
         if (prefectureId && japanPrefectureIds.includes(prefectureId)) {
           setHoveredFeatureId(prefectureId);
+          setHoveredFeature(feature);
+          setMousePosition({ x: event.point.x, y: event.point.y });
           mapRef.current.getCanvas().style.cursor = 'pointer';
         }
       } else {
         setHoveredFeatureId(null);
+        setHoveredFeature(null);
         mapRef.current.getCanvas().style.cursor = '';
       }
     },
@@ -399,6 +455,7 @@ const PrefectureMap: React.FC<PrefectureMapProps> = ({
     if (!mapRef.current) return;
 
     setHoveredFeatureId(null);
+    setHoveredFeature(null);
     mapRef.current.getCanvas().style.cursor = '';
   }, []);
 
@@ -431,14 +488,41 @@ const PrefectureMap: React.FC<PrefectureMapProps> = ({
   // 都道府県リストからモーダルを開く関数
   const openPrefectureModal = useCallback(
     async (prefectureId: number) => {
-      const { places, prefecture } = await fetchPrefectureData(prefectureId);
-      if (prefecture) {
-        setSelectedPrefecture(prefecture);
-        setModalPlaces(places);
-        setIsModalOpen(true);
+      // 都道府県の基本情報を取得（featuresから）
+      const feature = japanFeatures.find(
+        f => f.properties?.id === prefectureId
+      );
+      const prefectureName = feature?.properties?.nam_ja || '';
+
+      // 即座にモーダルを開く（ローディング状態で）
+      setSelectedPrefecture({
+        id: prefectureId,
+        name: prefectureName,
+        visited: feature?.properties?.visited || 0,
+        total: feature?.properties?.total || 0,
+      });
+      setModalPlaces(null); // 初期化
+      setIsModalLoading(true);
+      setIsModalOpen(true);
+      setErrorMessage(null);
+
+      try {
+        // 非同期でデータを取得
+        const { places, prefecture } = await fetchPrefectureData(prefectureId);
+
+        if (prefecture) {
+          setSelectedPrefecture(prefecture);
+          setModalPlaces(places);
+        }
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : 'データの取得に失敗しました';
+        setErrorMessage(errorMessage);
+      } finally {
+        setIsModalLoading(false);
       }
     },
-    [fetchPrefectureData]
+    [fetchPrefectureData, japanFeatures]
   );
 
   // 都道府県リストのクリックイベントリスナーを設定
@@ -462,8 +546,49 @@ const PrefectureMap: React.FC<PrefectureMapProps> = ({
     };
   }, [openPrefectureModal]);
 
+  // 全体の進捗を計算
+  const overallProgress = useMemo(() => {
+    if (japanFeatures.length === 0)
+      return { visited: 0, total: 0, percentage: 0 };
+
+    const totalVisited = japanFeatures.reduce(
+      (sum, feature) => sum + (feature.properties?.visited || 0),
+      0
+    );
+    const totalPlaces = japanFeatures.reduce(
+      (sum, feature) => sum + (feature.properties?.total || 0),
+      0
+    );
+    const percentage = totalPlaces > 0 ? (totalVisited / totalPlaces) * 100 : 0;
+
+    return {
+      visited: totalVisited,
+      total: totalPlaces,
+      percentage: Math.round(percentage),
+    };
+  }, [japanFeatures]);
+
   return (
-    <div className='h-full w-full'>
+    <div className='relative h-full w-full'>
+      {/* ヘッダー - ハンバーガーメニューとカテゴリ名と進捗表示 */}
+      <MapHeader
+        categoryName={categoryName}
+        overallProgress={overallProgress}
+        sidebarContent={
+          <SidebarContent
+            prefectures={japanFeatures.map(f => ({
+              id: f.properties?.id || 0,
+              name: f.properties?.nam_ja || '',
+              visited: f.properties?.visited || 0,
+              total: f.properties?.total || 0,
+              progress: f.properties?.progress || 0,
+            }))}
+            categoryName={categoryName}
+            onPrefectureSelect={openPrefectureModal}
+          />
+        }
+      />
+
       <Map
         ref={mapRef}
         initialViewState={{
@@ -574,30 +699,7 @@ const PrefectureMap: React.FC<PrefectureMapProps> = ({
         </div>
 
         {/* ホバー時の情報表示 */}
-        {hoveredFeatureId && (
-          <div className='absolute top-4 left-4 z-10 rounded-lg border border-gray-200 bg-white p-3 shadow-lg'>
-            {(() => {
-              const feature = japanFeatures.find(
-                f => f.properties?.id === hoveredFeatureId
-              );
-              if (!feature) return null;
-
-              const { nam_ja, visited, total, progress } =
-                feature.properties || {};
-              return (
-                <div className='text-sm'>
-                  <h4 className='font-semibold text-gray-900'>{nam_ja}</h4>
-                  <p className='text-gray-700'>
-                    {visited || 0} / {total || 0} 訪問済み
-                  </p>
-                  <p className='text-gray-700'>
-                    進捗: {Math.round((progress || 0) * 100)}%
-                  </p>
-                </div>
-              );
-            })()}
-          </div>
-        )}
+        <HoverInfo hoveredFeature={hoveredFeature} position={mousePosition} />
       </Map>
 
       {/* 都道府県詳細モーダル */}
@@ -606,14 +708,16 @@ const PrefectureMap: React.FC<PrefectureMapProps> = ({
         onClose={() => {
           setIsModalOpen(false);
           setErrorMessage(null); // モーダルを閉じるときにエラーメッセージをクリア
+          setIsModalLoading(false); // ローディング状態もリセット
         }}
         prefecture={selectedPrefecture}
         places={optimisticPlaces}
         onToggleVisit={handleToggleVisit}
         errorMessage={errorMessage}
+        isLoading={isModalLoading}
       />
     </div>
   );
-};
+}
 
 export default PrefectureMap;
