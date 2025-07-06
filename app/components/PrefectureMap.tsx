@@ -68,9 +68,6 @@ function PrefectureMap({
   onDataUpdate,
 }: PrefectureMapProps) {
   const mapRef = useRef<MapRef>(null);
-  const [hoveredFeatureId, setHoveredFeatureId] = useState<
-    string | number | null
-  >(null);
   const [hoveredFeature, setHoveredFeature] = useState<Feature | null>(null);
   const [mousePosition, setMousePosition] = useState<{ x: number; y: number }>({
     x: 0,
@@ -437,13 +434,11 @@ function PrefectureMap({
         const prefectureId = feature.properties?.id;
 
         if (prefectureId && japanPrefectureIds.includes(prefectureId)) {
-          setHoveredFeatureId(prefectureId);
           setHoveredFeature(feature);
           setMousePosition({ x: event.point.x, y: event.point.y });
           mapRef.current.getCanvas().style.cursor = 'pointer';
         }
       } else {
-        setHoveredFeatureId(null);
         setHoveredFeature(null);
         mapRef.current.getCanvas().style.cursor = '';
       }
@@ -454,7 +449,6 @@ function PrefectureMap({
   const handleMouseLeave = useCallback(() => {
     if (!mapRef.current) return;
 
-    setHoveredFeatureId(null);
     setHoveredFeature(null);
     mapRef.current.getCanvas().style.cursor = '';
   }, []);
@@ -617,7 +611,7 @@ function PrefectureMap({
             paint={{
               'fill-color': [
                 'case',
-                ['==', ['get', 'id'], hoveredFeatureId || -1],
+                ['==', ['get', 'id'], hoveredFeature?.properties?.id || -1],
                 '#3b82f6', // 青色でハイライト
                 ['==', ['get', 'progress'], 0],
                 '#f3f4f6', // 薄いグレー（未訪問）
