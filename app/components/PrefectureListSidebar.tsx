@@ -1,3 +1,7 @@
+import { Link } from 'react-router';
+
+import { useCurrentUser } from '~/api/hooks';
+import { signOut } from '~/api/supabaseClient';
 import {
   Accordion,
   AccordionContent,
@@ -39,6 +43,7 @@ const PrefectureListSidebar: React.FC<PrefectureListSidebarProps> = ({
   onPrefectureSelect,
   selectedPrefectureId,
 }) => {
+  const { data: userId } = useCurrentUser();
   const getProgressColor = (progress: number) => {
     if (progress === 0) return 'bg-gray-200';
     if (progress < 0.3) return 'bg-yellow-500';
@@ -89,6 +94,20 @@ const PrefectureListSidebar: React.FC<PrefectureListSidebarProps> = ({
       <div className='border-border bg-card border-b p-4'>
         <h1 className='text-foreground text-lg font-bold'>Place Tracker</h1>
         <p className='text-muted-foreground mt-1 text-xs'>地域別一覧</p>
+        <div className='mt-2'>
+          {userId ? (
+            <button
+              onClick={() => signOut()}
+              className='text-primary text-xs underline'
+            >
+              Logout
+            </button>
+          ) : (
+            <Link to='/login' className='text-primary text-xs underline'>
+              Login
+            </Link>
+          )}
+        </div>
       </div>
 
       {/* 地域別アコーディオンリスト */}

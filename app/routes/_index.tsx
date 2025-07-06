@@ -4,12 +4,11 @@ import { resolve } from 'path';
 import type { FeatureCollection } from 'geojson';
 import { useLoaderData } from 'react-router';
 
-import { supabase, getMockData } from '~/api/supabase.server';
+import { fetchPrefectureProgress, getUser } from '~/api/supabase.server';
 import PrefectureListSidebar from '~/components/PrefectureListSidebar';
 import PrefectureMap from '~/components/PrefectureMap';
 import {
   mergeProgressWithGeoJSON,
-  createMockFeatures,
   type PrefectureProgress,
 } from '~/lib/prefectures';
 
@@ -24,13 +23,11 @@ export function meta(_: Route.MetaArgs) {
   ];
 }
 
-export async function loader() {
+export async function loader({ request }: Route.LoaderArgs) {
+  const userId = await getUser(request);
   try {
     // ❶ progress 集計
-    const progress = supabase
-      ? ((await supabase.rpc('prefecture_progress')).data ??
-        getMockData.prefecture_progress())
-      : getMockData.prefecture_progress();
+    const progress = await fetchPrefectureProgress(userId);
 
     // ❂ GeoJSON ファイル (public/) を読み込む
     const geoJsonPath = resolve('public/japan-prefectures.geojson');
@@ -44,11 +41,7 @@ export async function loader() {
 
     return { features };
   } catch {
-    // Fallback: モックデータのみ使用
-    const progress = getMockData.prefecture_progress();
-    const features = createMockFeatures(progress as PrefectureProgress[]);
-
-    return { features };
+    throw new Response('Failed to load prefecture data', { status: 500 });
   }
 }
 
