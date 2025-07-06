@@ -1,4 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { useEffect } from 'react';
 import {
   isRouteErrorResponse,
   Links,
@@ -7,6 +8,9 @@ import {
   Scripts,
   ScrollRestoration,
 } from 'react-router';
+
+import { supabase } from '~/api/supabaseClient';
+import { AuthProvider } from '~/contexts/AuthContext';
 
 import type { Route } from './+types/root';
 import './app.css';
@@ -50,9 +54,20 @@ export function Layout({ children }: { children: React.ReactNode }) {
 }
 
 export default function App() {
+  useEffect(() => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(() => {
+      queryClient.invalidateQueries({ queryKey: ['user'] });
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
-      <Outlet />
+      <AuthProvider>
+        <Outlet />
+      </AuthProvider>
     </QueryClientProvider>
   );
 }

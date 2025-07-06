@@ -28,6 +28,7 @@
     "@react-router/fs-routes": "^7.6.3",
     "@react-router/node": "^7.5.3",
     "@react-router/serve": "^7.5.3",
+    "@supabase/ssr": "^0.6.1",
     "@supabase/supabase-js": "^2.50.3",
     "@tanstack/react-query": "^5.81.5",
     "class-variance-authority": "^0.7.1",

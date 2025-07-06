@@ -4,13 +4,17 @@ import { resolve } from 'path';
 import type { FeatureCollection } from 'geojson';
 import { useLoaderData } from 'react-router';
 
-import { supabase, getMockData, categories } from '~/api/supabase.server';
-import type { CategorySlug } from '~/api/supabase.server';
+import {
+  fetchPrefectureProgress,
+  fetchCategoryBySlug,
+  getUser,
+  createAuthenticatedSupabaseClient,
+  type CategorySlug,
+} from '~/api/supabase.server';
 import PrefectureListSidebar from '~/components/PrefectureListSidebar';
 import PrefectureMap from '~/components/PrefectureMap';
 import {
   mergeProgressWithGeoJSON,
-  createMockFeatures,
   type PrefectureProgress,
 } from '~/lib/prefectures';
 
@@ -28,19 +32,24 @@ export function meta({ data }: Route.MetaArgs) {
   ];
 }
 
-export async function loader({ params }: Route.LoaderArgs) {
+export async function loader({ request, params }: Route.LoaderArgs) {
+  const userId = await getUser(request);
   const slug = params.slug as CategorySlug | undefined;
-  const category = slug ? categories.find(c => c.slug === slug) : undefined;
+  const category = slug ? await fetchCategoryBySlug(slug) : undefined;
   if (!category) {
     throw new Response('Category not found', { status: 404 });
   }
   try {
-    // ❶ progress 集計
-    const progress = supabase
-      ? ((
-          await supabase.rpc('prefecture_progress', { p_category: category.id })
-        ).data ?? getMockData.prefecture_progress(category.id))
-      : getMockData.prefecture_progress(category.id);
+    // 認証されたSupabaseクライアントを作成
+    const authenticatedSupabase =
+      await createAuthenticatedSupabaseClient(request);
+
+    // ❶ progress 集計（認証されたクライアントを使用）
+    const progress = await fetchPrefectureProgress(
+      userId,
+      category.id,
+      authenticatedSupabase
+    );
 
     // ❂ GeoJSON ファイル (public/) を読み込む
     const geoJsonPath = resolve('public/japan-prefectures.geojson');
@@ -54,11 +63,7 @@ export async function loader({ params }: Route.LoaderArgs) {
 
     return { features, category };
   } catch {
-    // Fallback: モックデータのみ使用
-    const progress = getMockData.prefecture_progress(category.id);
-    const features = createMockFeatures(progress as PrefectureProgress[]);
-
-    return { features, category };
+    throw new Response('Failed to load prefecture data', { status: 500 });
   }
 }
 
