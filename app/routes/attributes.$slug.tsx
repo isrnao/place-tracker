@@ -2,7 +2,8 @@ import { readFile } from 'fs/promises';
 import { resolve } from 'path';
 
 import type { FeatureCollection } from 'geojson';
-import { useLoaderData } from 'react-router';
+import { useCallback } from 'react';
+import { useLoaderData, useRevalidator } from 'react-router';
 
 import {
   fetchPrefectureProgress,
@@ -69,6 +70,11 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 
 export default function Home() {
   const { features, category } = useLoaderData<typeof loader>();
+  const revalidator = useRevalidator();
+
+  const handleDataUpdate = useCallback(() => {
+    revalidator.revalidate();
+  }, [revalidator]);
 
   // 都道府県リスト用のデータを準備
   interface PrefectureProperties {
@@ -100,7 +106,11 @@ export default function Home() {
 
       {/* 右側 - マップ */}
       <div className='relative flex-1'>
-        <PrefectureMap features={features} categorySlug={category.slug} />
+        <PrefectureMap
+          features={features}
+          categorySlug={category.slug}
+          onDataUpdate={handleDataUpdate}
+        />
       </div>
     </main>
   );
