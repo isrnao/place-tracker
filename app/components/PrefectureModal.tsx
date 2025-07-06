@@ -1,3 +1,5 @@
+import { useMemo } from 'react';
+
 import { Button } from '~/components/ui/button';
 import {
   Dialog,
@@ -33,10 +35,40 @@ const PrefectureModal: React.FC<PrefectureModalProps> = ({
   onToggleVisit,
   errorMessage,
 }) => {
+  // placesから楽観的に更新された進捗を計算
+  const optimisticProgress = useMemo(() => {
+    if (!prefecture) {
+      return {
+        visited: 0,
+        total: 0,
+        percentage: 0,
+      };
+    }
+
+    if (!places || places.length === 0) {
+      return {
+        visited: prefecture.visited,
+        total: prefecture.total,
+        percentage:
+          prefecture.total > 0
+            ? (prefecture.visited / prefecture.total) * 100
+            : 0,
+      };
+    }
+
+    const visitedCount = places.filter(place => place.visited).length;
+    const totalCount = places.length;
+
+    return {
+      visited: visitedCount,
+      total: totalCount,
+      percentage: totalCount > 0 ? (visitedCount / totalCount) * 100 : 0,
+    };
+  }, [places, prefecture]);
+
   if (!prefecture) return null;
 
-  const progressPercentage =
-    prefecture.total > 0 ? (prefecture.visited / prefecture.total) * 100 : 0;
+  const progressPercentage = optimisticProgress.percentage;
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -73,7 +105,8 @@ const PrefectureModal: React.FC<PrefectureModalProps> = ({
           {/* 進捗情報 */}
           <div className='text-center'>
             <p className='mb-4 text-lg text-gray-600'>
-              訪問済み: {prefecture.visited} / {prefecture.total}
+              訪問済み: {optimisticProgress.visited} /{' '}
+              {optimisticProgress.total}
             </p>
             <div className='mx-auto max-w-sm'>
               <div className='h-3 w-full rounded-full bg-gray-200'>
