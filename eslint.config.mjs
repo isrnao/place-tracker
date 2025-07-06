@@ -194,6 +194,7 @@ export default [
       'server/**/*.{ts,js}',
       'app/entry.server.tsx',
       'app/api/**/*.{ts,tsx}',
+      'api/**/*.{ts,js}',
     ],
     languageOptions: {
       globals: {

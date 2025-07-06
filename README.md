@@ -66,39 +66,35 @@ pnpm build:server
 pnpm start:server
 ```
 
-## アーキテクチャ
+## デプロイ
 
-- **app/routes/**: ファイルベースルーティング
-- **app/api/**: Supabaseヘルパー関数
-- **app/entry.client.tsx**: クライアントエントリーポイント
-- **app/entry.server.tsx**: サーバーエントリーポイント
-- **server/index.ts**: Express SSRサーバー
+### Vercelデプロイ
 
-## 主な技術スタック
+1. **Vercelアカウント設定**:
+   - [Vercel](https://vercel.com)にサインアップ
+   - GitHubリポジトリを接続
 
-- React Router v7
-- Supabase
-- TanStack Query
-- TypeScript
-- Tailwind CSS
-- Express
-- Vite
+2. **環境変数設定**:
+   Vercelダッシュボードで以下の環境変数を設定:
 
-```bash
-npm run dev
-```
+   ```env
+   SUPABASE_URL=your_supabase_url_here
+   SUPABASE_ANON_KEY=your_supabase_anon_key_here
+   ```
 
-Your application will be available at `http://localhost:5173`.
+3. **デプロイ**:
 
-## Building for Production
+   ```bash
+   # Vercel CLIを使用する場合
+   pnpm i -g vercel
+   vercel --prod
+   ```
 
-Create a production build:
+   または、GitHub連携による自動デプロイ
 
-```bash
-npm run build
-```
-
-## Deployment
+4. **設定ファイル**:
+   - `vercel.json`: Vercelデプロイ設定
+   - `api/ssr.js`: SSRエントリーポイント
 
 ### Docker Deployment
 
@@ -124,11 +120,11 @@ The containerized application can be deployed to any platform that supports Dock
 
 If you're familiar with deploying Node applications, the built-in app server is production-ready.
 
-Make sure to deploy the output of `npm run build`
+Make sure to deploy the output of `pnpm run build`
 
 ```
 ├── package.json
-├── package-lock.json (or pnpm-lock.yaml, or bun.lockb)
+├── pnpm-lock.yaml
 ├── build/
 │   ├── client/    # Static assets
 │   └── server/    # Server-side code
