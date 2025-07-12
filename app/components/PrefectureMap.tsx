@@ -1,5 +1,5 @@
 import type { Feature } from 'geojson';
-import React, {
+import {
   useRef,
   useEffect,
   useLayoutEffect,
@@ -74,7 +74,6 @@ function PrefectureMap({
   });
   const [currentZoom, setCurrentZoom] = useState(5.2);
   const [mapLoaded, setMapLoaded] = useState(false);
-
 
   // モーダル関連のstate
   const [isModalOpen, setIsModalOpen] = useState(false);
