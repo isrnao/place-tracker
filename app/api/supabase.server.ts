@@ -92,10 +92,7 @@ export async function getUser(request: Request): Promise<string | null> {
 
     const userPromise = supabase.auth.getUser(token);
 
-    const result = await Promise.race([
-      userPromise,
-      timeoutPromise,
-    ]);
+    const result = await Promise.race([userPromise, timeoutPromise]);
 
     const { data, error: _error } = result;
 
