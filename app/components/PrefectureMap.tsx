@@ -75,6 +75,13 @@ function PrefectureMap({
   const [currentZoom, setCurrentZoom] = useState(5.2);
   const [mapLoaded, setMapLoaded] = useState(false);
 
+  // SSR対応: ブラウザ環境かどうかを判定
+  const [_isBrowser, setIsBrowser] = useState(false);
+
+  useEffect(() => {
+    setIsBrowser(typeof window !== 'undefined');
+  }, []);
+
   // モーダル関連のstate
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedPrefecture, setSelectedPrefecture] = useState<{
@@ -577,21 +584,52 @@ function PrefectureMap({
 
             const fontSize = Math.max(10, Math.min(18, currentZoom * 2.5));
 
+            // 画面外でも表示するよう、範囲を大幅に緩和
+            const isVisible =
+              label.x > -150 &&
+              label.x < window.innerWidth + 150 &&
+              label.y > -100 &&
+              label.y < window.innerHeight + 100;
+
+            if (!isVisible) return null;
+
+            // 画面端での表示位置を調整
+            let adjustedX = label.x - 50;
+            let adjustedY = label.y - 10;
+
+            // 左端での調整
+            if (adjustedX < 5) {
+              adjustedX = 5;
+            }
+            // 右端での調整
+            if (adjustedX > window.innerWidth - 105) {
+              adjustedX = window.innerWidth - 105;
+            }
+            // 上端での調整
+            if (adjustedY < 5) {
+              adjustedY = 5;
+            }
+            // 下端での調整
+            if (adjustedY > window.innerHeight - 25) {
+              adjustedY = window.innerHeight - 25;
+            }
+
             return (
               <div
                 key={label.id}
                 className='pointer-events-none absolute select-none'
                 style={{
-                  left: label.x - 50,
-                  top: label.y - 10,
+                  left: adjustedX,
+                  top: adjustedY,
                   width: 100,
                   textAlign: 'center',
                   fontSize: `${fontSize}px`,
                   color: '#1f2937',
                   fontWeight: 'bold',
                   textShadow:
-                    '1px 1px 2px rgba(255,255,255,0.8), -1px -1px 2px rgba(255,255,255,0.8), 1px -1px 2px rgba(255,255,255,0.8), -1px 1px 2px rgba(255,255,255,0.8)',
+                    '2px 2px 4px rgba(255,255,255,0.95), -2px -2px 4px rgba(255,255,255,0.95), 2px -2px 4px rgba(255,255,255,0.95), -2px 2px 4px rgba(255,255,255,0.95)',
                   zIndex: 10,
+                  WebkitTextStroke: '0.8px white',
                 }}
               >
                 {label.name}

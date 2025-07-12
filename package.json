@@ -6,8 +6,8 @@
     "node": "20.x"
   },
   "scripts": {
-    "build": "react-router build",
-    "build:server": "vite build --config vite.config.server.ts",
+    "build": "pnpm run optimize-geojson && react-router build",
+    "build:server": "pnpm run optimize-geojson && vite build --config vite.config.server.ts",
     "dev": "react-router dev",
     "dev:server": "ts-node-dev --respawn --transpile-only server/index.ts",
     "start": "react-router-serve ./build/server/index.js",
@@ -17,7 +17,8 @@
     "fix": "eslint . --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "quality": "pnpm run typecheck && pnpm run lint && pnpm run format:check"
+    "quality": "pnpm run typecheck && pnpm run lint && pnpm run format:check",
+    "optimize-geojson": "tsx scripts/optimize-geojson.ts"
   },
   "dependencies": {
     "@mapbox/geojson-extent": "^1.0.1",
@@ -79,6 +80,7 @@
     "tw-animate-css": "^1.3.5",
     "typescript": "^5.8.3",
     "vite": "^6.3.3",
+    "vite-plugin-compression": "^0.5.1",
     "vite-tsconfig-paths": "^5.1.4"
   }
 }

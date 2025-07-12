@@ -1,7 +1,3 @@
-import { readFile } from 'fs/promises';
-import { resolve } from 'path';
-
-import type { FeatureCollection } from 'geojson';
 import { useCallback } from 'react';
 import { redirect, useLoaderData, useRevalidator } from 'react-router';
 
@@ -11,6 +7,7 @@ import {
   createAuthenticatedSupabaseClient,
 } from '~/api/supabase.server';
 import PrefectureMap from '~/components/PrefectureMap';
+import { getGeoJSON } from '~/lib/geojson-cache';
 import {
   mergeProgressWithGeoJSON,
   type PrefectureProgress,
@@ -44,10 +41,8 @@ export async function loader({ request }: Route.LoaderArgs) {
       authenticatedSupabase
     );
 
-    // ❂ GeoJSON ファイル (public/) を読み込む
-    const geoJsonPath = resolve('public/japan-prefectures.geojson');
-    const geoJsonContent = await readFile(geoJsonPath, 'utf-8');
-    const geo = JSON.parse(geoJsonContent) as FeatureCollection;
+    // ❂ キャッシュされたGeoJSONを取得
+    const geo = await getGeoJSON();
 
     const features = mergeProgressWithGeoJSON(
       progress as PrefectureProgress[],
