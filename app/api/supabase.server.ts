@@ -48,6 +48,10 @@ export async function createAuthenticatedSupabaseClient(request: Request) {
       return null;
     }
 
+    // AbortControllerを使用してタイムアウト付きでトークンをテスト
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5秒タイムアウト
+
     // トークンを使用してSupabaseクライアントを作成
     const client = createClient(supabaseUrl, supabaseAnonKey, {
       auth: { persistSession: false },
@@ -55,16 +59,32 @@ export async function createAuthenticatedSupabaseClient(request: Request) {
         headers: {
           Authorization: `Bearer ${token}`,
         },
+        fetch: (url, options = {}) => {
+          return fetch(url, {
+            ...options,
+            signal: controller.signal,
+          });
+        },
       },
     });
 
-    // トークンが有効かテストしてみる
-    const { data: user, error: _error } = await client.auth.getUser(token);
-    if (_error || !user.user) {
+    try {
+      // トークンが有効かテストしてみる
+      const { data: user, error: _error } = await client.auth.getUser(token);
+      clearTimeout(timeoutId);
+
+      if (_error || !user.user) {
+        return null;
+      }
+
+      return client;
+    } catch (error) {
+      clearTimeout(timeoutId);
+      if (error instanceof Error && error.name === 'AbortError') {
+        console.warn('Supabase auth token validation timeout');
+      }
       return null;
     }
-
-    return client;
   } catch {
     return null;
   }
@@ -85,26 +105,45 @@ export async function getUser(request: Request): Promise<string | null> {
       return null;
     }
 
-    // タイムアウト付きでユーザー情報を取得
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => reject(new Error('Timeout')), 5000); // 5秒タイムアウト
-    });
+    // AbortControllerを使用してタイムアウト付きでユーザー情報を取得
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5秒タイムアウト
 
-    const userPromise = supabase.auth.getUser(token);
+    try {
+      // AbortControllerのシグナルを使用してSupabaseクライアントを作成
+      const clientWithAbort = createClient(supabaseUrl, supabaseAnonKey, {
+        auth: { persistSession: false },
+        global: {
+          fetch: (url, options = {}) => {
+            return fetch(url, {
+              ...options,
+              signal: controller.signal,
+            });
+          },
+        },
+      });
 
-    const result = await Promise.race([userPromise, timeoutPromise]);
+      const { data, error: _error } = await clientWithAbort.auth.getUser(token);
+      clearTimeout(timeoutId);
 
-    const { data, error: _error } = result;
+      if (_error) {
+        console.warn('Supabase auth error:', _error);
+        return null;
+      }
 
-    if (_error) {
-      console.warn('Supabase auth error:', _error);
+      const userId = data.user?.id ?? null;
+      return userId;
+    } catch (error) {
+      clearTimeout(timeoutId);
+      if (error instanceof Error && error.name === 'AbortError') {
+        console.warn('Supabase auth request timeout');
+      } else {
+        console.warn('Failed to get user:', error);
+      }
       return null;
     }
-
-    const userId = data.user?.id ?? null;
-    return userId;
-  } catch (error) {
-    console.warn('Failed to get user:', error);
+  } catch (outerError) {
+    console.warn('Failed to get user:', outerError);
     return null;
   }
 }
