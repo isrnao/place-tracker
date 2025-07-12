@@ -12,6 +12,7 @@ import {
 
 interface CustomAuthProps {
   onSignIn?: () => void;
+  isLoading?: boolean;
 }
 
 interface FormErrors {
@@ -20,7 +21,10 @@ interface FormErrors {
   general?: string;
 }
 
-export default function CustomAuth({ onSignIn }: CustomAuthProps) {
+export default function CustomAuth({
+  onSignIn,
+  isLoading: externalLoading,
+}: CustomAuthProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -28,6 +32,9 @@ export default function CustomAuth({ onSignIn }: CustomAuthProps) {
   const [showResetPassword, setShowResetPassword] = useState(false);
   const [message, setMessage] = useState('');
   const [errors, setErrors] = useState<FormErrors>({});
+
+  // 外部からのローディング状態と内部のローディング状態を統合
+  const isActuallyLoading = isLoading || externalLoading;
 
   const validateForm = (): boolean => {
     const newErrors: FormErrors = {};
@@ -296,12 +303,23 @@ export default function CustomAuth({ onSignIn }: CustomAuthProps) {
                   <p className='text-sm text-red-800'>{errors.general}</p>
                 </div>
               )}
-              <Button type='submit' disabled={isLoading} className='w-full'>
-                {isLoading
-                  ? '処理中...'
-                  : isSignUp
-                    ? 'アカウント作成'
-                    : 'ログイン'}
+              <Button
+                type='submit'
+                disabled={isActuallyLoading}
+                className='w-full'
+              >
+                <div className='flex items-center justify-center'>
+                  {isActuallyLoading && (
+                    <div className='mr-2 h-4 w-4 animate-spin rounded-full border-b-2 border-white'></div>
+                  )}
+                  {isActuallyLoading
+                    ? externalLoading
+                      ? '地図を準備中...'
+                      : '処理中...'
+                    : isSignUp
+                      ? 'アカウント作成'
+                      : 'ログイン'}
+                </div>
               </Button>
             </form>
 

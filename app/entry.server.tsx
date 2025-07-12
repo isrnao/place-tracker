@@ -3,6 +3,7 @@ import { PassThrough } from 'node:stream';
 import { createReadableStreamFromReadable } from '@react-router/node';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { isbot } from 'isbot';
+import React from 'react';
 import { renderToPipeableStream } from 'react-dom/server';
 import type { EntryContext } from 'react-router';
 import { ServerRouter } from 'react-router';

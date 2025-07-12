@@ -14,7 +14,17 @@ if (!supabaseAnonKey) {
 }
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  auth: { persistSession: true },
+  auth: {
+    persistSession: true,
+  },
+  global: {
+    fetch: (url, options = {}) => {
+      return fetch(url, {
+        ...options,
+        signal: AbortSignal.timeout(15000), // 15秒タイムアウト
+      });
+    },
+  },
 });
 
 export async function getCurrentUser() {

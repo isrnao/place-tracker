@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   isRouteErrorResponse,
   Links,
@@ -7,9 +7,12 @@ import {
   Outlet,
   Scripts,
   ScrollRestoration,
+  useNavigation,
+  useLocation,
 } from 'react-router';
 
 import { supabase } from '~/api/supabaseClient';
+import { MapSkeleton } from '~/components/MapSkeleton';
 import { AuthProvider } from '~/contexts/AuthContext';
 
 import type { Route } from './+types/root';
@@ -55,15 +58,36 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
 export default function App() {
   const [isHydrated, setIsHydrated] = useState(false);
+  const navigation = useNavigation();
+  const location = useLocation();
+
+  // ルートページ（地図）へのナビゲーション中かどうかを判定
+  const isLoadingMapData =
+    navigation.state === 'loading' &&
+    (navigation.location?.pathname === '/' || location.pathname === '/');
 
   useEffect(() => {
     setIsHydrated(true);
 
+    // 認証状態変更時のクエリ無効化を最適化
+    let lastUserId: string | null = null;
+
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(() => {
-      queryClient.invalidateQueries({ queryKey: ['user'] });
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      const currentUserId = session?.user?.id || null;
+
+      // ユーザーIDが実際に変更された場合のみクエリを無効化
+      if (currentUserId !== lastUserId) {
+        queryClient.invalidateQueries({ queryKey: ['user'] });
+        // mapDataキャッシュもクリア
+        if (!currentUserId) {
+          queryClient.removeQueries({ queryKey: ['mapData'] });
+        }
+        lastUserId = currentUserId;
+      }
     });
+
     return () => subscription.unsubscribe();
   }, []);
 
@@ -79,7 +103,8 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <Outlet />
+        {/* 地図データのローディング中はスケルトンを表示 */}
+        {isLoadingMapData ? <MapSkeleton /> : <Outlet />}
       </AuthProvider>
     </QueryClientProvider>
   );

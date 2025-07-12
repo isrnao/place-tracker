@@ -1,5 +1,5 @@
 import type { Feature } from 'geojson';
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 
 import PrefectureMap from './PrefectureMap';
 
