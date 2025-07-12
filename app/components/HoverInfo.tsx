@@ -11,12 +11,34 @@ function HoverInfo({ hoveredFeature, position }: HoverInfoProps) {
 
   const { nam_ja, visited, total, progress } = hoveredFeature.properties || {};
 
+  // 座標値が有効な数値であることを確認
+  const isValidPosition =
+    position &&
+    typeof position.x === 'number' &&
+    typeof position.y === 'number' &&
+    !isNaN(position.x) &&
+    !isNaN(position.y) &&
+    isFinite(position.x) &&
+    isFinite(position.y);
+
+  if (!isValidPosition) {
+    console.warn('Invalid position values:', position);
+    return null;
+  }
+
+  // ウィンドウサイズも確認
+  const windowWidth = typeof window !== 'undefined' ? window.innerWidth : 1200;
+  const windowHeight = typeof window !== 'undefined' ? window.innerHeight : 800;
+
+  const left = Math.min(Math.max(position.x + 10, 10), windowWidth - 200);
+  const top = Math.min(Math.max(position.y - 10, 10), windowHeight - 100);
+
   return (
     <div
       className='pointer-events-none absolute z-20 rounded-lg border border-gray-200 bg-white p-3 shadow-lg'
       style={{
-        left: Math.min(position.x + 10, window.innerWidth - 200),
-        top: Math.max(position.y - 10, 10),
+        left,
+        top,
         maxWidth: '200px',
       }}
     >

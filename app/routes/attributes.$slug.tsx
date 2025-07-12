@@ -1,7 +1,3 @@
-import { readFile } from 'fs/promises';
-import { resolve } from 'path';
-
-import type { FeatureCollection } from 'geojson';
 import { useCallback } from 'react';
 import { useLoaderData, useRevalidator } from 'react-router';
 
@@ -13,14 +9,13 @@ import {
   type CategorySlug,
 } from '~/api/supabase.server';
 import PrefectureMap from '~/components/PrefectureMap';
+import { getGeoJSON } from '~/lib/geojson-cache';
 import {
   mergeProgressWithGeoJSON,
   type PrefectureProgress,
 } from '~/lib/prefectures';
 
 import type { Route } from './+types/attributes.$slug';
-
-import 'maplibre-gl/dist/maplibre-gl.css';
 
 export function meta({ data }: Route.MetaArgs) {
   return [
@@ -51,10 +46,8 @@ export async function loader({ request, params }: Route.LoaderArgs) {
       authenticatedSupabase
     );
 
-    // ❂ GeoJSON ファイル (public/) を読み込む
-    const geoJsonPath = resolve('public/japan-prefectures.geojson');
-    const geoJsonContent = await readFile(geoJsonPath, 'utf-8');
-    const geo = JSON.parse(geoJsonContent) as FeatureCollection;
+    // ❂ キャッシュされたGeoJSONを取得
+    const geo = await getGeoJSON();
 
     const features = mergeProgressWithGeoJSON(
       progress as PrefectureProgress[],

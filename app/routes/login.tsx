@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
 
 import { supabase } from '~/api/supabaseClient';
@@ -10,13 +10,18 @@ export const meta = () => [{ title: 'Login - Place Tracker' }];
 export default function Login() {
   const navigate = useNavigate();
   const { user, isLoading } = useAuth();
+  const [isHydrated, setIsHydrated] = useState(false);
 
   useEffect(() => {
-    // 既にログインしている場合はメインページにリダイレクト
-    if (user) {
+    setIsHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    // ハイドレーション後で既にログインしている場合はメインページにリダイレクト
+    if (isHydrated && user) {
       navigate('/', { replace: true });
     }
-  }, [user, navigate]);
+  }, [user, navigate, isHydrated]);
 
   useEffect(() => {
     const {

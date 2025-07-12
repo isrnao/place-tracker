@@ -9,13 +9,24 @@ interface AuthContextType {
   signOut: () => Promise<void>;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const AuthContext = createContext<AuthContextType>({
+  user: null,
+  isLoading: true,
+  signOut: async () => {},
+});
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
+
+  // SSR中やハイドレーション前はデフォルト値を返す
+  if (typeof window === 'undefined') {
+    return {
+      user: null,
+      isLoading: true,
+      signOut: async () => {},
+    };
   }
+
   return context;
 };
 
@@ -28,13 +39,25 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    // クライアントサイドでのみ実行
+    if (typeof window === 'undefined') {
+      setIsLoading(false);
+      return;
+    }
+
     // 初期認証状態を取得
     const getInitialSession = async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      setUser(session?.user ?? null);
-      setIsLoading(false);
+      try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        setUser(session?.user ?? null);
+      } catch (error) {
+        console.error('Error getting initial session:', error);
+        setUser(null);
+      } finally {
+        setIsLoading(false);
+      }
     };
 
     getInitialSession();
@@ -47,14 +70,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setIsLoading(false);
 
       // セッション情報をサーバーに送信してCookieを設定
-      if (session) {
-        await fetch('/api/auth/session', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ session }),
-        });
+      if (session && typeof window !== 'undefined') {
+        try {
+          await fetch('/api/auth/session', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ session }),
+          });
+        } catch (error) {
+          console.error('Error setting session cookie:', error);
+        }
       }
     });
 
@@ -64,11 +91,17 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, []);
 
   const signOut = async () => {
-    await supabase.auth.signOut();
-    // サーバーのセッションもクリア
-    await fetch('/api/auth/session', {
-      method: 'DELETE',
-    });
+    try {
+      await supabase.auth.signOut();
+      // サーバーのセッションもクリア
+      if (typeof window !== 'undefined') {
+        await fetch('/api/auth/session', {
+          method: 'DELETE',
+        });
+      }
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
   };
 
   const value = {

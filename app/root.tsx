@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import {
   isRouteErrorResponse,
   Links,
@@ -54,7 +54,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
 }
 
 export default function App() {
+  const [isHydrated, setIsHydrated] = useState(false);
+
   useEffect(() => {
+    setIsHydrated(true);
+
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(() => {
@@ -62,6 +66,15 @@ export default function App() {
     });
     return () => subscription.unsubscribe();
   }, []);
+
+  // SSR中はAuthProviderなしでレンダリング
+  if (!isHydrated) {
+    return (
+      <QueryClientProvider client={queryClient}>
+        <Outlet />
+      </QueryClientProvider>
+    );
+  }
 
   return (
     <QueryClientProvider client={queryClient}>

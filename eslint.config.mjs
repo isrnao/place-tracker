@@ -231,4 +231,30 @@ export default [
       'import/no-default-export': 'off',
     },
   },
+
+  // Scripts and docs
+  {
+    files: ['scripts/**/*.{ts,js}', 'docs/**/*.{ts,js}'],
+    languageOptions: {
+      globals: {
+        ...globals.node,
+      },
+    },
+    rules: {
+      'no-console': 'off',
+      'no-undef': 'off',
+      '@typescript-eslint/no-var-requires': 'off',
+    },
+  },
+
+  // App lib utilities (may need Node.js features)
+  {
+    files: ['app/lib/**/*.{ts,js}'],
+    languageOptions: {
+      globals: {
+        ...globals.browser,
+        ...globals.node, // Add Node.js globals for utility functions
+      },
+    },
+  },
 ];
