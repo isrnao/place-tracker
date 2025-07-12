@@ -6,6 +6,14 @@ const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || '';
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: { persistSession: false },
+  global: {
+    fetch: (url, options = {}) => {
+      return fetch(url, {
+        ...options,
+        signal: AbortSignal.timeout(15000), // 15秒タイムアウト
+      });
+    },
+  },
 });
 
 // 認証されたSupabaseクライアントを作成する関数
@@ -77,14 +85,29 @@ export async function getUser(request: Request): Promise<string | null> {
       return null;
     }
 
-    const { data, error: _error } = await supabase.auth.getUser(token);
+    // タイムアウト付きでユーザー情報を取得
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error('Timeout')), 5000); // 5秒タイムアウト
+    });
+
+    const userPromise = supabase.auth.getUser(token);
+
+    const result = await Promise.race([
+      userPromise,
+      timeoutPromise,
+    ]);
+
+    const { data, error: _error } = result;
+
     if (_error) {
+      console.warn('Supabase auth error:', _error);
       return null;
     }
 
     const userId = data.user?.id ?? null;
     return userId;
-  } catch {
+  } catch (error) {
+    console.warn('Failed to get user:', error);
     return null;
   }
 }

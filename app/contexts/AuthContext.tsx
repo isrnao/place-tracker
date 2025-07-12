@@ -72,13 +72,17 @@ export function AuthProvider({ children }: AuthProviderProps) {
       // セッション情報をサーバーに送信してCookieを設定
       if (session && typeof window !== 'undefined') {
         try {
-          await fetch('/api/auth/session', {
+          const response = await fetch('/api/auth/session', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({ session }),
           });
+
+          if (!response.ok) {
+            console.warn('Failed to set session cookie:', response.status);
+          }
         } catch (error) {
           console.error('Error setting session cookie:', error);
         }

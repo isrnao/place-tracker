@@ -11,13 +11,14 @@ export default function Login() {
   const navigate = useNavigate();
   const { user, isLoading } = useAuth();
   const [isHydrated, setIsHydrated] = useState(false);
+  const [isSigningIn, setIsSigningIn] = useState(false);
 
   useEffect(() => {
     setIsHydrated(true);
   }, []);
 
   useEffect(() => {
-    // ハイドレーション後で既にログインしている場合はメインページにリダイレクト
+    // ハイドレーション後で既にログインしている場合は地図画面にリダイレクト
     if (isHydrated && user) {
       navigate('/', { replace: true });
     }
@@ -28,6 +29,7 @@ export default function Login() {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_IN' && session) {
+        setIsSigningIn(true);
         navigate('/', { replace: true });
       }
     });
@@ -36,16 +38,17 @@ export default function Login() {
   }, [navigate]);
 
   const handleSignIn = () => {
+    setIsSigningIn(true);
     navigate('/', { replace: true });
   };
 
-  // ローディング中は何も表示しない
+  // 初期ローディング中の表示
   if (isLoading) {
     return (
       <main className='flex h-screen items-center justify-center bg-gray-50'>
         <div className='text-center'>
           <div className='mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-b-2 border-blue-600'></div>
-          <p className='text-gray-600'>読み込み中...</p>
+          <p className='text-gray-600'>認証情報を確認中...</p>
         </div>
       </main>
     );
@@ -58,7 +61,7 @@ export default function Login() {
 
   return (
     <main className='flex h-screen items-center justify-center bg-gray-50'>
-      <CustomAuth onSignIn={handleSignIn} />
+      <CustomAuth onSignIn={handleSignIn} isLoading={isSigningIn} />
     </main>
   );
 }
