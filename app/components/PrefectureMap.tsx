@@ -75,12 +75,6 @@ function PrefectureMap({
   const [currentZoom, setCurrentZoom] = useState(5.2);
   const [mapLoaded, setMapLoaded] = useState(false);
 
-  // SSR対応: ブラウザ環境かどうかを判定
-  const [_isBrowser, setIsBrowser] = useState(false);
-
-  useEffect(() => {
-    setIsBrowser(typeof window !== 'undefined');
-  }, []);
 
   // モーダル関連のstate
   const [isModalOpen, setIsModalOpen] = useState(false);
