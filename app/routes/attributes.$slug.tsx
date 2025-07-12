@@ -20,8 +20,6 @@ import {
 
 import type { Route } from './+types/attributes.$slug';
 
-import 'maplibre-gl/dist/maplibre-gl.css';
-
 export function meta({ data }: Route.MetaArgs) {
   return [
     { title: `${data?.category.name} - Place Tracker` },

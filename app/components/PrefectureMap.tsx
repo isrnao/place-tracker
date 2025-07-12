@@ -1,5 +1,4 @@
-import type { Feature, FeatureCollection } from 'geojson';
-import type { MapMouseEvent } from 'maplibre-gl';
+import type { Feature } from 'geojson';
 import React, {
   useRef,
   useEffect,
@@ -9,13 +8,13 @@ import React, {
   useCallback,
   startTransition,
 } from 'react';
-import { Map, Source, Layer } from 'react-map-gl/maplibre';
-import type { MapRef } from 'react-map-gl/maplibre';
 
 import HoverInfo from './HoverInfo';
 import MapHeader from './MapHeader';
 import PrefectureModal from './PrefectureModal';
 import SidebarContent from './SidebarContent';
+import type { MapEvent, WebGPUMapRef } from './WebGPUMap';
+import WebGPUMap from './WebGPUMap';
 
 // 都道府県の中心座標を計算する関数
 const calculateCentroid = (feature: Feature): [number, number] => {
@@ -67,7 +66,7 @@ function PrefectureMap({
   categoryName,
   onDataUpdate,
 }: PrefectureMapProps) {
-  const mapRef = useRef<MapRef>(null);
+  const mapRef = useRef<WebGPUMapRef>(null);
   const [hoveredFeature, setHoveredFeature] = useState<Feature | null>(null);
   const [mousePosition, setMousePosition] = useState<{ x: number; y: number }>({
     x: 0,
@@ -238,15 +237,6 @@ function PrefectureMap({
     };
   }, [queueLabelUpdate]);
 
-  // GeoJSONコレクションを作成
-  const geoJsonData: FeatureCollection = useMemo(
-    () => ({
-      type: 'FeatureCollection',
-      features: japanFeatures,
-    }),
-    [japanFeatures]
-  );
-
   // 進捗度に基づく色の式を生成（メモ化）
 
   // 都道府県の詳細データを取得する関数
@@ -371,12 +361,10 @@ function PrefectureMap({
 
   // マップクリック処理
   const handleMapClick = useCallback(
-    async (event: MapMouseEvent) => {
+    async (event: MapEvent) => {
       if (!mapRef.current) return;
 
-      const features = mapRef.current.queryRenderedFeatures(event.point, {
-        layers: ['prefecture-fill'],
-      });
+      const features = mapRef.current.queryRenderedFeatures(event.point);
 
       if (features.length > 0) {
         const feature = features[0];
@@ -422,12 +410,10 @@ function PrefectureMap({
 
   // マウスホバー処理
   const handleMouseEnter = useCallback(
-    (event: MapMouseEvent) => {
+    (event: MapEvent) => {
       if (!mapRef.current) return;
 
-      const features = mapRef.current.queryRenderedFeatures(event.point, {
-        layers: ['prefecture-fill'],
-      });
+      const features = mapRef.current.queryRenderedFeatures(event.point);
 
       if (features.length > 0) {
         const feature = features[0];
@@ -436,11 +422,17 @@ function PrefectureMap({
         if (prefectureId && japanPrefectureIds.includes(prefectureId)) {
           setHoveredFeature(feature);
           setMousePosition({ x: event.point.x, y: event.point.y });
-          mapRef.current.getCanvas().style.cursor = 'pointer';
+          if (mapRef.current) {
+            const c = mapRef.current.getCanvas();
+            if (c) c.style.cursor = 'pointer';
+          }
         }
       } else {
         setHoveredFeature(null);
-        mapRef.current.getCanvas().style.cursor = '';
+        if (mapRef.current) {
+          const c = mapRef.current.getCanvas();
+          if (c) c.style.cursor = '';
+        }
       }
     },
     [japanPrefectureIds]
@@ -450,7 +442,8 @@ function PrefectureMap({
     if (!mapRef.current) return;
 
     setHoveredFeature(null);
-    mapRef.current.getCanvas().style.cursor = '';
+    const c = mapRef.current?.getCanvas();
+    if (c) c.style.cursor = '';
   }, []);
 
   // マップの移動・ズーム時の処理（throttled）
@@ -460,24 +453,6 @@ function PrefectureMap({
     setCurrentZoom(zoom);
     queueLabelUpdate(); // throttledな更新
   }, [queueLabelUpdate]);
-
-  // マップスタイルの設定
-  const mapStyle = useMemo(
-    () => ({
-      version: 8 as const,
-      sources: {},
-      layers: [
-        {
-          id: 'background',
-          type: 'background' as const,
-          paint: {
-            'background-color': '#a7f3d0', // 明るい青緑（海を表現）
-          },
-        },
-      ],
-    }),
-    []
-  );
 
   // 都道府県リストからモーダルを開く関数
   const openPrefectureModal = useCallback(
@@ -583,59 +558,18 @@ function PrefectureMap({
         }
       />
 
-      <Map
+      <WebGPUMap
         ref={mapRef}
-        initialViewState={{
-          longitude: 138.0,
-          latitude: 37.0,
-          zoom: 5.2,
-        }}
-        style={{ width: '100%', height: '100%' }}
-        mapStyle={mapStyle}
+        features={japanFeatures}
+        initialViewState={{ longitude: 138.0, latitude: 37.0, zoom: 5.2 }}
         onClick={handleMapClick}
         onMouseMove={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
         onMove={handleMove}
         onLoad={handleMapLoad}
-        maxBounds={[
-          [120.0, 23.0], // 南西角（より広く）
-          [150.0, 47.0], // 北東角（北海道の右上部により余白を追加）
-        ]}
         minZoom={4}
         maxZoom={10}
       >
-        <Source id='prefectures' type='geojson' data={geoJsonData}>
-          <Layer
-            id='prefecture-fill'
-            type='fill'
-            paint={{
-              'fill-color': [
-                'case',
-                ['==', ['get', 'id'], hoveredFeature?.properties?.id || -1],
-                '#3b82f6', // 青色でハイライト
-                ['==', ['get', 'progress'], 0],
-                '#f3f4f6', // 薄いグレー（未訪問）
-                ['<', ['get', 'progress'], 0.3],
-                '#fef3c7', // 薄い黄色
-                ['<', ['get', 'progress'], 0.6],
-                '#fed7aa', // オレンジ
-                ['<', ['get', 'progress'], 0.9],
-                '#fca5a5', // 薄い赤
-                '#10b981', // 緑
-              ],
-              'fill-opacity': 0.8,
-            }}
-          />
-          <Layer
-            id='prefecture-border'
-            type='line'
-            paint={{
-              'line-color': '#374151',
-              'line-width': 1,
-            }}
-          />
-        </Source>
-
         {/* 都道府県名をHTMLオーバーレイで表示 */}
         {currentZoom >= 4.5 &&
           labelPositions.map(label => {
@@ -694,7 +628,7 @@ function PrefectureMap({
 
         {/* ホバー時の情報表示 */}
         <HoverInfo hoveredFeature={hoveredFeature} position={mousePosition} />
-      </Map>
+      </WebGPUMap>
 
       {/* 都道府県詳細モーダル */}
       <PrefectureModal

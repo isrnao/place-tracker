@@ -18,8 +18,6 @@ import {
 
 import type { Route } from './+types/_index';
 
-import 'maplibre-gl/dist/maplibre-gl.css';
-
 export function meta(_: Route.MetaArgs) {
   return [
     { title: 'Place Tracker - 日本全国の場所を訪問記録' },
