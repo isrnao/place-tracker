@@ -1,5 +1,5 @@
 import type { User } from '@supabase/supabase-js';
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useState } from 'react';
 
 import { supabase } from '~/api/supabaseClient';
 

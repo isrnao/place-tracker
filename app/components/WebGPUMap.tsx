@@ -1,11 +1,12 @@
 import earcut from 'earcut';
 import type { Feature } from 'geojson';
 import RBush from 'rbush';
-import React, {
+import {
   forwardRef,
   useEffect,
   useImperativeHandle,
   useRef,
+  useState,
 } from 'react';
 
 export interface MapEvent {
@@ -143,10 +144,8 @@ const WebGPUMap = forwardRef<WebGPUMapRef, WebGPUMapProps>(function WebGPUMap(
   },
   ref
 ) {
-  const [isHydrated, setIsHydrated] = React.useState(false);
-  const [webGPUSupported, setWebGPUSupported] = React.useState<boolean | null>(
-    null
-  );
+  const [isHydrated, setIsHydrated] = useState(false);
+  const [webGPUSupported, setWebGPUSupported] = useState<boolean | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const deviceRef = useRef<GPUDevice | null>(null);
   const zoomRef = useRef(
