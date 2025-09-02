@@ -1,11 +1,8 @@
 import React, { useCallback } from 'react';
 import { redirect, useLoaderData, useRevalidator } from 'react-router';
 
-import {
-  fetchPrefectureProgress,
-  getUser,
-  createAuthenticatedSupabaseClient,
-} from '~/api/supabase.server';
+import { fetchPrefectureProgress } from '~/api/supabase.server';
+import { authenticateRoute } from '~/lib/auth.middleware';
 import PrefectureMap from '~/components/PrefectureMap';
 import { getGeoJSON } from '~/lib/geojson-cache';
 import {
@@ -23,22 +20,16 @@ export function meta(_: Route.MetaArgs) {
 }
 
 export async function loader({ request }: Route.LoaderArgs) {
-  const userId = await getUser(request);
-
-  if (!userId) {
-    throw redirect('/login');
-  }
+  // 認証ミドルウェアを使用
+  const { userId, headers, authenticatedClient } =
+    await authenticateRoute(request);
 
   try {
-    // 認証されたSupabaseクライアントを作成
-    const authenticatedSupabase =
-      await createAuthenticatedSupabaseClient(request);
-
     // ❶ progress 集計（認証されたクライアントを使用）
     const progress = await fetchPrefectureProgress(
       userId,
       undefined,
-      authenticatedSupabase
+      authenticatedClient
     );
 
     // ❂ キャッシュされたGeoJSONを取得
@@ -50,8 +41,12 @@ export async function loader({ request }: Route.LoaderArgs) {
     );
 
     return { features };
-  } catch {
-    throw new Response('Failed to load prefecture data', { status: 500 });
+  } catch (error) {
+    console.error('Failed to load prefecture data:', error);
+    throw new Response('Failed to load prefecture data', {
+      status: 500,
+      headers,
+    });
   }
 }
 

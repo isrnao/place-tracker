@@ -34,13 +34,22 @@ export async function getCurrentUser() {
 
 export async function signOut() {
   try {
+    // Supabaseからサインアウト
     await supabase.auth.signOut();
-  } catch {
+    
+    // サーバーセッションもクリア
+    await fetch('/api/auth/session', {
+      method: 'DELETE',
+    });
+  } catch (error) {
+    console.error('Error during sign out:', error);
     // エラーが発生してもログアウト処理を続行
   }
+  
   // ローカルストレージをクリア
   localStorage.clear();
   sessionStorage.clear();
+  
   // ログアウト後にログイン画面にリダイレクト
   window.location.href = '/login';
 }

@@ -4,11 +4,10 @@ import { redirect } from 'react-router';
 import {
   fetchPlacesWithVisit,
   fetchCategoryBySlug,
-  getUser,
-  createAuthenticatedSupabaseClient,
   supabase,
   type CategorySlug,
 } from '~/api/supabase.server';
+import { authenticateRoute } from '~/lib/auth.middleware';
 
 import type { Route } from './+types/prefecture-data';
 
@@ -55,15 +54,9 @@ async function fetchPlacesAndProgress(
 }
 
 export async function loader({ request }: Route.LoaderArgs) {
-  const userId = await getUser(request);
-
-  if (!userId) {
-    throw redirect('/login');
-  }
-
-  // 認証されたSupabaseクライアントを作成
-  const authenticatedSupabase =
-    await createAuthenticatedSupabaseClient(request);
+  // 改善された認証ミドルウェアを使用
+  const { userId, headers, authenticatedClient } =
+    await authenticateRoute(request);
 
   const url = new URL(request.url);
   const prefectureId = Number(url.searchParams.get('id'));
@@ -73,28 +66,33 @@ export async function loader({ request }: Route.LoaderArgs) {
     : undefined;
 
   if (!prefectureId) {
-    throw new Response('Prefecture ID is required', { status: 400 });
+    throw new Response('Prefecture ID is required', {
+      status: 400,
+      headers,
+    });
   }
 
-  return await fetchPlacesAndProgress(
-    userId,
-    prefectureId,
-    category?.id,
-    authenticatedSupabase
-  );
+  try {
+    return await fetchPlacesAndProgress(
+      userId,
+      prefectureId,
+      category?.id,
+      authenticatedClient
+    );
+  } catch (error) {
+    console.error('Failed to fetch places and progress:', error);
+    throw new Response('Failed to load data', {
+      status: 500,
+      headers,
+    });
+  }
 }
 
 export async function action({ request }: Route.ActionArgs) {
-  const userId = await getUser(request);
+  // 改善された認証ミドルウェアを使用
+  const { userId, authenticatedClient } = await authenticateRoute(request);
 
-  if (!userId) {
-    return { ok: false, error: 'User not authenticated' };
-  }
-
-  // 認証されたSupabaseクライアントを作成
-  const authenticatedSupabase =
-    await createAuthenticatedSupabaseClient(request);
-  if (!authenticatedSupabase) {
+  if (!authenticatedClient) {
     return { ok: false, error: 'Failed to create authenticated client' };
   }
 
@@ -105,7 +103,7 @@ export async function action({ request }: Route.ActionArgs) {
   try {
     if (visited) {
       // 訪問済みなので、レコードを削除
-      const result = await authenticatedSupabase
+      const result = await authenticatedClient
         .from('visits')
         .delete()
         .eq('user_id', userId)
@@ -119,7 +117,7 @@ export async function action({ request }: Route.ActionArgs) {
 
       // 既存のレコードがあるかチェック
       const { data: existingVisit, error: checkError } =
-        await authenticatedSupabase
+        await authenticatedClient
           .from('visits')
           .select('*')
           .eq('user_id', userId)
@@ -135,7 +133,7 @@ export async function action({ request }: Route.ActionArgs) {
         return { ok: true };
       }
 
-      const result = await authenticatedSupabase
+      const result = await authenticatedClient
         .from('visits')
         .insert({ user_id: userId, place_id: placeId });
 
