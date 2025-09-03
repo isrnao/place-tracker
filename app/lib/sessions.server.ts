@@ -1,4 +1,4 @@
-import { createCookieSessionStorage } from "react-router";
+import { createCookieSessionStorage } from 'react-router';
 
 // セッションデータの型定義
 export interface SessionData {
@@ -21,20 +21,20 @@ export interface FlashData {
 export const { getSession, commitSession, destroySession } =
   createCookieSessionStorage<SessionData, FlashData>({
     cookie: {
-      name: "__session",
+      name: '__session',
       httpOnly: true,
-      sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
-      path: "/",
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+      path: '/',
       maxAge: 60 * 60 * 24, // 1日
-      secrets: [process.env.SESSION_SECRET || "fallback-secret-key"],
+      secrets: [process.env.SESSION_SECRET || 'fallback-secret-key'],
     },
   });
 
 // セッション有効性チェック
 export function isSessionValid(sessionData: SessionData): boolean {
   if (!sessionData.supabaseSession) return false;
-  
+
   const now = Math.floor(Date.now() / 1000);
   return sessionData.supabaseSession.expires_at > now;
 }
@@ -42,10 +42,10 @@ export function isSessionValid(sessionData: SessionData): boolean {
 // セッションの更新が必要かチェック
 export function shouldRefreshSession(sessionData: SessionData): boolean {
   if (!sessionData.supabaseSession) return false;
-  
+
   const now = Math.floor(Date.now() / 1000);
   const expiresAt = sessionData.supabaseSession.expires_at;
   const refreshThreshold = 5 * 60; // 5分前
-  
-  return (expiresAt - now) < refreshThreshold;
+
+  return expiresAt - now < refreshThreshold;
 }

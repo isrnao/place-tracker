@@ -9,16 +9,13 @@ import {
   CardHeader,
   CardTitle,
 } from '~/components/ui/card';
+import { useFormError } from '~/lib/useAuthError';
+import { ErrorDisplay, FieldError, SuccessDisplay } from './ErrorDisplay';
+import { translateSupabaseError } from '~/lib/auth.errors';
 
 interface CustomAuthProps {
   onSignIn?: () => void;
   isLoading?: boolean;
-}
-
-interface FormErrors {
-  email?: string;
-  password?: string;
-  general?: string;
 }
 
 export default function CustomAuth({
@@ -27,163 +24,158 @@ export default function CustomAuth({
 }: CustomAuthProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
   const [isSignUp, setIsSignUp] = useState(false);
   const [showResetPassword, setShowResetPassword] = useState(false);
   const [message, setMessage] = useState('');
-  const [errors, setErrors] = useState<FormErrors>({});
+
+  // 統一されたエラーハンドリングを使用
+  const {
+    isLoading,
+    fieldErrors,
+    setFieldError,
+    clearFieldError,
+    clearAllFieldErrors,
+    executeWithErrorHandling,
+    getUserError,
+    clearError,
+  } = useFormError();
 
   // 外部からのローディング状態と内部のローディング状態を統合
   const isActuallyLoading = isLoading || externalLoading;
 
   const validateForm = (): boolean => {
-    const newErrors: FormErrors = {};
+    clearAllFieldErrors();
+    let isValid = true;
 
     // メールアドレスの検証
     if (!email) {
-      newErrors.email = 'メールアドレスを入力してください';
+      setFieldError('email', 'メールアドレスを入力してください');
+      isValid = false;
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      newErrors.email = '有効なメールアドレスを入力してください';
+      setFieldError('email', '有効なメールアドレスを入力してください');
+      isValid = false;
     }
 
     // パスワードの検証
     if (!password) {
-      newErrors.password = 'パスワードを入力してください';
+      setFieldError('password', 'パスワードを入力してください');
+      isValid = false;
     } else if (password.length < 6) {
-      newErrors.password = 'パスワードは6文字以上である必要があります';
+      setFieldError('password', 'パスワードは6文字以上である必要があります');
+      isValid = false;
     }
 
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    return isValid;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setMessage('');
-    setErrors({});
+    clearError();
 
     if (!validateForm()) {
       return;
     }
 
-    setIsLoading(true);
-
-    try {
-      if (isSignUp) {
-        const { error } = await supabase.auth.signUp({
-          email,
-          password,
-        });
-        if (error) {
-          // Supabaseのエラーを日本語に翻訳
-          const translatedError = translateSupabaseError(error.message);
-          setErrors({ general: translatedError });
+    const result = await executeWithErrorHandling(
+      async () => {
+        if (isSignUp) {
+          const { error } = await supabase.auth.signUp({
+            email,
+            password,
+          });
+          if (error) {
+            throw error;
+          }
+          return 'signup_success';
         } else {
-          setMessage(
-            '確認メールを送信しました。メールを確認してアカウントを有効化してください。'
-          );
+          const { error } = await supabase.auth.signInWithPassword({
+            email,
+            password,
+          });
+          if (error) {
+            throw error;
+          }
+          return 'signin_success';
         }
-      } else {
-        const { error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-        if (error) {
-          const translatedError = translateSupabaseError(error.message);
-          setErrors({ general: translatedError });
-        } else {
-          onSignIn?.();
-        }
-      }
-    } catch {
-      setErrors({
-        general: 'ネットワークエラーが発生しました。後ほど再試行してください。',
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
+      },
+      isSignUp ? 'signup' : 'signin',
+      { timeout: 15000 }
+    );
 
-  const translateSupabaseError = (errorMessage: string): string => {
-    if (errorMessage.includes('Invalid login credentials')) {
-      return 'メールアドレスまたはパスワードが正しくありません';
+    if (result === 'signup_success') {
+      const isDevelopment =
+        window.location.hostname === 'localhost' ||
+        window.location.hostname === '127.0.0.1';
+      const message = isDevelopment
+        ? '確認メールを送信しました。開発環境では http://localhost:54324 でメールを確認できます。メール内のリンクをクリックしてアカウントを有効化してください。'
+        : '確認メールを送信しました。メールを確認してアカウントを有効化してください。';
+      setMessage(message);
+    } else if (result === 'signin_success') {
+      onSignIn?.();
     }
-    if (errorMessage.includes('User already registered')) {
-      return 'このメールアドレスは既に登録されています';
-    }
-    if (errorMessage.includes('Password should be at least 6 characters')) {
-      return 'パスワードは6文字以上である必要があります';
-    }
-    if (errorMessage.includes('Invalid email')) {
-      return '有効なメールアドレスを入力してください';
-    }
-    if (errorMessage.includes('Email not confirmed')) {
-      return 'メールアドレスの確認が完了していません。確認メールをチェックしてください';
-    }
-    return errorMessage;
   };
 
   const handleGoogleSignIn = async () => {
-    try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: window.location.origin,
-        },
-      });
-      if (error) {
-        const translatedError = translateSupabaseError(error.message);
-        setErrors({ general: translatedError });
-      }
-    } catch {
-      setErrors({
-        general:
-          'Googleログインでエラーが発生しました。後ほど再試行してください。',
-      });
-    }
+    await executeWithErrorHandling(
+      async () => {
+        const { error } = await supabase.auth.signInWithOAuth({
+          provider: 'google',
+          options: {
+            redirectTo: window.location.origin,
+          },
+        });
+        if (error) {
+          throw error;
+        }
+      },
+      'google_oauth',
+      { timeout: 30000 } // OAuth は時間がかかる場合があるため30秒
+    );
   };
 
   const handleModeSwitch = () => {
     setIsSignUp(!isSignUp);
     setShowResetPassword(false);
     setMessage('');
-    setErrors({});
+    clearError();
+    clearAllFieldErrors();
     setEmail('');
     setPassword('');
   };
 
   const handleResetPassword = async () => {
     if (!email) {
-      setErrors({
-        email: 'パスワードリセットのためメールアドレスを入力してください',
-      });
+      setFieldError(
+        'email',
+        'パスワードリセットのためメールアドレスを入力してください'
+      );
       return;
     }
 
-    setIsLoading(true);
     setMessage('');
-    setErrors({});
+    clearError();
 
-    try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/reset-password`,
-      });
+    const result = await executeWithErrorHandling(
+      async () => {
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: `${window.location.origin}/reset-password`,
+        });
 
-      if (error) {
-        const translatedError = translateSupabaseError(error.message);
-        setErrors({ general: translatedError });
-      } else {
-        setMessage(
-          'パスワードリセットのメールを送信しました。メールを確認してください。'
-        );
-        setShowResetPassword(false);
-      }
-    } catch {
-      setErrors({
-        general: 'エラーが発生しました。後ほど再試行してください。',
-      });
-    } finally {
-      setIsLoading(false);
+        if (error) {
+          throw error;
+        }
+        return 'reset_success';
+      },
+      'password_reset',
+      { timeout: 15000 }
+    );
+
+    if (result === 'reset_success') {
+      setMessage(
+        'パスワードリセットのメールを送信しました。メールを確認してください。'
+      );
+      setShowResetPassword(false);
     }
   };
 
@@ -216,21 +208,28 @@ export default function CustomAuth({
                 id='email'
                 type='email'
                 value={email}
-                onChange={e => setEmail(e.target.value)}
+                onChange={e => {
+                  setEmail(e.target.value);
+                  if (fieldErrors.email) {
+                    clearFieldError('email');
+                  }
+                }}
                 required
                 className={`w-full rounded-md border px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none ${
-                  errors.email ? 'border-red-500' : 'border-gray-300'
+                  fieldErrors.email ? 'border-red-500' : 'border-gray-300'
                 }`}
                 placeholder='example@example.com'
               />
-              {errors.email && (
-                <p className='mt-1 text-sm text-red-600'>{errors.email}</p>
-              )}
+              <FieldError error={fieldErrors.email} />
             </div>
-            {errors.general && (
-              <div className='rounded-md border border-red-200 bg-red-50 p-3'>
-                <p className='text-sm text-red-800'>{errors.general}</p>
-              </div>
+            {getUserError() && (
+              <ErrorDisplay
+                title={getUserError()?.title}
+                message={getUserError()?.message || ''}
+                action={getUserError()?.action}
+                canRetry={getUserError()?.canRetry}
+                onDismiss={clearError}
+              />
             )}
             <div className='flex space-x-2'>
               <Button
@@ -263,16 +262,19 @@ export default function CustomAuth({
                   id='email'
                   type='email'
                   value={email}
-                  onChange={e => setEmail(e.target.value)}
+                  onChange={e => {
+                    setEmail(e.target.value);
+                    if (fieldErrors.email) {
+                      clearFieldError('email');
+                    }
+                  }}
                   required
                   className={`w-full rounded-md border px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none ${
-                    errors.email ? 'border-red-500' : 'border-gray-300'
+                    fieldErrors.email ? 'border-red-500' : 'border-gray-300'
                   }`}
                   placeholder='example@example.com'
                 />
-                {errors.email && (
-                  <p className='mt-1 text-sm text-red-600'>{errors.email}</p>
-                )}
+                <FieldError error={fieldErrors.email} />
               </div>
               <div>
                 <label
@@ -285,23 +287,30 @@ export default function CustomAuth({
                   id='password'
                   type='password'
                   value={password}
-                  onChange={e => setPassword(e.target.value)}
+                  onChange={e => {
+                    setPassword(e.target.value);
+                    if (fieldErrors.password) {
+                      clearFieldError('password');
+                    }
+                  }}
                   required
                   className={`w-full rounded-md border px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none ${
-                    errors.password ? 'border-red-500' : 'border-gray-300'
+                    fieldErrors.password ? 'border-red-500' : 'border-gray-300'
                   }`}
                   placeholder={
                     isSignUp ? '6文字以上のパスワード' : 'パスワード'
                   }
                 />
-                {errors.password && (
-                  <p className='mt-1 text-sm text-red-600'>{errors.password}</p>
-                )}
+                <FieldError error={fieldErrors.password} />
               </div>
-              {errors.general && (
-                <div className='rounded-md border border-red-200 bg-red-50 p-3'>
-                  <p className='text-sm text-red-800'>{errors.general}</p>
-                </div>
+              {getUserError() && (
+                <ErrorDisplay
+                  title={getUserError()?.title}
+                  message={getUserError()?.message || ''}
+                  action={getUserError()?.action}
+                  canRetry={getUserError()?.canRetry}
+                  onDismiss={clearError}
+                />
               )}
               <Button
                 type='submit'
@@ -368,9 +377,11 @@ export default function CustomAuth({
         )}
 
         {message && (
-          <div className='mt-4 rounded-md border border-green-200 bg-green-50 p-3'>
-            <p className='text-sm text-green-800'>{message}</p>
-          </div>
+          <SuccessDisplay
+            message={message}
+            onDismiss={() => setMessage('')}
+            className='mt-4'
+          />
         )}
       </CardContent>
     </Card>

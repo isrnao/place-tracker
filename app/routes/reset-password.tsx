@@ -10,6 +10,12 @@ import {
   CardHeader,
   CardTitle,
 } from '~/components/ui/card';
+import { useFormError } from '~/lib/useAuthError';
+import {
+  ErrorDisplay,
+  FieldError,
+  SuccessDisplay,
+} from '~/components/ErrorDisplay';
 
 export const meta = () => [{ title: 'パスワードリセット - Place Tracker' }];
 
@@ -18,9 +24,19 @@ export default function ResetPassword() {
   const navigate = useNavigate();
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState('');
-  const [error, setError] = useState('');
+
+  // 統一されたエラーハンドリングを使用
+  const {
+    isLoading,
+    fieldErrors,
+    setFieldError,
+    clearFieldError,
+    clearAllFieldErrors,
+    executeWithErrorHandling,
+    getUserError,
+    clearError,
+  } = useFormError();
 
   useEffect(() => {
     // URLからトークンを取得してSupabaseのセッションを確認
@@ -37,49 +53,50 @@ export default function ResetPassword() {
     }
   }, []);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setMessage('');
-
-    if (password !== confirmPassword) {
-      setError('パスワードが一致しません');
-      return;
-    }
+  const validateForm = (): boolean => {
+    clearAllFieldErrors();
+    let isValid = true;
 
     if (password.length < 6) {
-      setError('パスワードは6文字以上である必要があります');
+      setFieldError('password', 'パスワードは6文字以上である必要があります');
+      isValid = false;
+    }
+
+    if (password !== confirmPassword) {
+      setFieldError('confirmPassword', 'パスワードが一致しません');
+      isValid = false;
+    }
+
+    return isValid;
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setMessage('');
+    clearError();
+
+    if (!validateForm()) {
       return;
     }
 
-    setIsLoading(true);
+    const result = await executeWithErrorHandling(
+      async () => {
+        const { error } = await supabase.auth.updateUser({ password });
+        if (error) {
+          throw error;
+        }
+        return 'password_updated';
+      },
+      'password_update',
+      { timeout: 15000 }
+    );
 
-    try {
-      const { error } = await supabase.auth.updateUser({ password });
-
-      if (error) {
-        setError(translateSupabaseError(error.message));
-      } else {
-        setMessage('パスワードが正常に更新されました。');
-        setTimeout(() => {
-          navigate('/', { replace: true });
-        }, 2000);
-      }
-    } catch {
-      setError('エラーが発生しました。後ほど再試行してください。');
-    } finally {
-      setIsLoading(false);
+    if (result === 'password_updated') {
+      setMessage('パスワードが正常に更新されました。');
+      setTimeout(() => {
+        navigate('/', { replace: true });
+      }, 2000);
     }
-  };
-
-  const translateSupabaseError = (errorMessage: string): string => {
-    if (errorMessage.includes('Password should be at least 6 characters')) {
-      return 'パスワードは6文字以上である必要があります';
-    }
-    if (errorMessage.includes('Unable to validate email address')) {
-      return 'メールアドレスの検証に失敗しました。リンクの有効期限が切れている可能性があります。';
-    }
-    return errorMessage;
   };
 
   return (
@@ -91,15 +108,22 @@ export default function ResetPassword() {
         </CardHeader>
         <CardContent>
           {message && (
-            <div className='mb-4 rounded-md border border-green-200 bg-green-50 p-3'>
-              <p className='text-sm text-green-800'>{message}</p>
-            </div>
+            <SuccessDisplay
+              message={message}
+              onDismiss={() => setMessage('')}
+              className='mb-4'
+            />
           )}
 
-          {error && (
-            <div className='mb-4 rounded-md border border-red-200 bg-red-50 p-3'>
-              <p className='text-sm text-red-800'>{error}</p>
-            </div>
+          {getUserError() && (
+            <ErrorDisplay
+              title={getUserError()?.title}
+              message={getUserError()?.message || ''}
+              action={getUserError()?.action}
+              canRetry={getUserError()?.canRetry}
+              onDismiss={clearError}
+              className='mb-4'
+            />
           )}
 
           <form onSubmit={handleSubmit} className='space-y-4'>
@@ -114,11 +138,19 @@ export default function ResetPassword() {
                 id='password'
                 type='password'
                 value={password}
-                onChange={e => setPassword(e.target.value)}
+                onChange={e => {
+                  setPassword(e.target.value);
+                  if (fieldErrors.password) {
+                    clearFieldError('password');
+                  }
+                }}
                 required
-                className='w-full rounded-md border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none'
+                className={`w-full rounded-md border px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none ${
+                  fieldErrors.password ? 'border-red-500' : 'border-gray-300'
+                }`}
                 placeholder='6文字以上のパスワード'
               />
+              <FieldError error={fieldErrors.password} />
             </div>
 
             <div>
@@ -132,11 +164,21 @@ export default function ResetPassword() {
                 id='confirmPassword'
                 type='password'
                 value={confirmPassword}
-                onChange={e => setConfirmPassword(e.target.value)}
+                onChange={e => {
+                  setConfirmPassword(e.target.value);
+                  if (fieldErrors.confirmPassword) {
+                    clearFieldError('confirmPassword');
+                  }
+                }}
                 required
-                className='w-full rounded-md border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none'
+                className={`w-full rounded-md border px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none ${
+                  fieldErrors.confirmPassword
+                    ? 'border-red-500'
+                    : 'border-gray-300'
+                }`}
                 placeholder='パスワードを再入力'
               />
+              <FieldError error={fieldErrors.confirmPassword} />
             </div>
 
             <Button type='submit' disabled={isLoading} className='w-full'>

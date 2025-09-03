@@ -11,10 +11,12 @@ export class ClientSessionService {
    */
   static async isSessionValid(): Promise<boolean> {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
       if (!session) return false;
-      
+
       const now = Math.floor(Date.now() / 1000);
       return session.expires_at ? session.expires_at > now : false;
     } catch (error) {
@@ -28,14 +30,16 @@ export class ClientSessionService {
    */
   static async shouldRefreshSession(): Promise<boolean> {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
       if (!session || !session.expires_at) return false;
-      
+
       const now = Math.floor(Date.now() / 1000);
       const refreshThreshold = 5 * 60; // 5分前
-      
-      return (session.expires_at - now) < refreshThreshold;
+
+      return session.expires_at - now < refreshThreshold;
     } catch (error) {
       console.error('Error checking if session should refresh:', error);
       return false;
@@ -52,7 +56,7 @@ export class ClientSessionService {
     }
 
     this.refreshPromise = this._performRefresh();
-    
+
     try {
       const result = await this.refreshPromise;
       return result;
@@ -64,7 +68,7 @@ export class ClientSessionService {
   private static async _performRefresh(): Promise<boolean> {
     try {
       const { data, error } = await supabase.auth.refreshSession();
-      
+
       if (error || !data.session) {
         console.error('Session refresh failed:', error);
         return false;
@@ -72,7 +76,7 @@ export class ClientSessionService {
 
       // サーバーとセッションを同期
       await this.syncWithServer(data.session);
-      
+
       return true;
     } catch (error) {
       console.error('Error refreshing session:', error);
@@ -122,7 +126,7 @@ export class ClientSessionService {
   static watchSessionTimeout(onTimeout: () => void): () => void {
     const checkTimeout = setInterval(async () => {
       const isValid = await this.isSessionValid();
-      
+
       if (!isValid) {
         onTimeout();
       }

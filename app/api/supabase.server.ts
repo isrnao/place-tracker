@@ -22,7 +22,7 @@ export async function createAuthenticatedSupabaseClient(request: Request) {
     // 改善された認証ミドルウェアを使用してクライアントを取得
     const { protectedRouteAuth } = await import('~/lib/auth.middleware');
     const authResult = await protectedRouteAuth(request);
-    
+
     if (authResult.authenticatedClient) {
       return authResult.authenticatedClient;
     }
@@ -30,7 +30,7 @@ export async function createAuthenticatedSupabaseClient(request: Request) {
     // フォールバック: SessionServiceから直接取得
     const { SessionService } = await import('~/lib/session.service');
     const authClient = await SessionService.getAuthenticatedClient(request);
-    
+
     if (authClient) {
       return supabase;
     }
@@ -41,7 +41,7 @@ export async function createAuthenticatedSupabaseClient(request: Request) {
     if (error instanceof Response) {
       throw error;
     }
-    
+
     console.warn('Failed to create authenticated client:', error);
     return null;
   }

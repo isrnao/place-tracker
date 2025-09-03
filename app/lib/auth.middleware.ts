@@ -1,12 +1,12 @@
-import { SessionService } from "./session.service";
-import { 
-  AuthErrorCode, 
-  createAuthError, 
-  handleAuthError, 
+import { SessionService } from './session.service';
+import {
+  AuthErrorCode,
+  createAuthError,
+  handleAuthError,
   isTimeoutError,
   isNetworkError,
-  type AuthError 
-} from "./auth.errors";
+  type AuthError,
+} from './auth.errors';
 
 /**
  * 認証結果の型定義
@@ -28,7 +28,7 @@ export async function getUser(request: Request): Promise<string | null> {
     // タイムアウト付きで認証チェックを実行
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 10000); // 10秒タイムアウト
-    
+
     try {
       const authResult = await Promise.race([
         SessionService.validateAndRefreshSession(request),
@@ -36,24 +36,24 @@ export async function getUser(request: Request): Promise<string | null> {
           controller.signal.addEventListener('abort', () => {
             reject(new Error('Authentication timeout'));
           });
-        })
+        }),
       ]);
-      
+
       clearTimeout(timeoutId);
       return authResult.userId;
     } catch (error) {
       clearTimeout(timeoutId);
-      
+
       if (isTimeoutError(error)) {
         console.warn('Authentication timeout:', error);
         return null;
       }
-      
+
       if (isNetworkError(error)) {
         console.warn('Network error during authentication:', error);
         return null;
       }
-      
+
       console.error('Authentication error:', error);
       return null;
     }
@@ -71,7 +71,7 @@ export async function authenticateUser(request: Request): Promise<AuthResult> {
     // タイムアウト付きで認証チェックを実行
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 10000); // 10秒タイムアウト
-    
+
     try {
       const result = await Promise.race([
         SessionService.validateAndRefreshSession(request),
@@ -79,26 +79,26 @@ export async function authenticateUser(request: Request): Promise<AuthResult> {
           controller.signal.addEventListener('abort', () => {
             reject(createAuthError(AuthErrorCode.TIMEOUT_ERROR));
           });
-        })
+        }),
       ]);
-      
+
       clearTimeout(timeoutId);
-      
+
       return {
         userId: result.userId,
         headers: result.headers,
         shouldRedirect: result.shouldRedirect,
-        isExpired: result.shouldRedirect && !result.userId
+        isExpired: result.shouldRedirect && !result.userId,
       };
     } catch (error) {
       clearTimeout(timeoutId);
-      
+
       const authError = handleAuthError(error);
       return {
         userId: null,
         error: authError,
         shouldRedirect: true,
-        isExpired: authError.code === AuthErrorCode.SESSION_EXPIRED
+        isExpired: authError.code === AuthErrorCode.SESSION_EXPIRED,
       };
     }
   } catch (error) {
@@ -106,7 +106,7 @@ export async function authenticateUser(request: Request): Promise<AuthResult> {
     return {
       userId: null,
       error: authError,
-      shouldRedirect: true
+      shouldRedirect: true,
     };
   }
 }
@@ -120,35 +120,38 @@ export async function requireAuth(request: Request): Promise<{
   headers?: Headers;
 }> {
   const authResult = await authenticateUser(request);
-  
+
   if (!authResult.userId || authResult.shouldRedirect) {
     // ログインページにリダイレクト（現在のURLを保存）
     const url = new URL(request.url);
     const redirectTo = url.pathname + url.search;
     const loginUrl = `/login?redirectTo=${encodeURIComponent(redirectTo)}`;
-    
+
     // エラー情報をセッションに保存
     if (authResult.error) {
       try {
-        const { getSession, commitSession } = await import("./sessions.server");
-        const session = await getSession(request.headers.get("Cookie"));
-        session.flash("error", authResult.error.message);
-        
+        const { getSession, commitSession } = await import('./sessions.server');
+        const session = await getSession(request.headers.get('Cookie'));
+        session.flash('error', authResult.error.message);
+
         const headers = new Headers(authResult.headers);
-        headers.set("Set-Cookie", await commitSession(session));
-        
-        const { redirect } = await import("react-router");
+        headers.set('Set-Cookie', await commitSession(session));
+
+        const { redirect } = await import('react-router');
         throw redirect(loginUrl, { headers });
       } catch (sessionError) {
-        console.error("Failed to save error to session:", sessionError);
+        console.error('Failed to save error to session:', sessionError);
       }
     }
-    
+
     // Dynamic import to avoid SSR issues
-    const { redirect } = await import("react-router");
-    throw redirect(loginUrl, authResult.headers ? { headers: authResult.headers } : undefined);
+    const { redirect } = await import('react-router');
+    throw redirect(
+      loginUrl,
+      authResult.headers ? { headers: authResult.headers } : undefined
+    );
   }
-  
+
   return { userId: authResult.userId, headers: authResult.headers };
 }
 
@@ -159,13 +162,16 @@ export async function requireGuest(request: Request): Promise<{
   headers?: Headers;
 }> {
   const authResult = await authenticateUser(request);
-  
+
   if (authResult.userId) {
     // メインページにリダイレクト
-    const { redirect } = await import("react-router");
-    throw redirect("/", authResult.headers ? { headers: authResult.headers } : undefined);
+    const { redirect } = await import('react-router');
+    throw redirect(
+      '/',
+      authResult.headers ? { headers: authResult.headers } : undefined
+    );
   }
-  
+
   return { headers: authResult.headers };
 }
 
@@ -178,11 +184,11 @@ export async function checkAuth(request: Request): Promise<{
   error?: AuthError;
 }> {
   const authResult = await authenticateUser(request);
-  
-  return { 
-    userId: authResult.userId, 
+
+  return {
+    userId: authResult.userId,
     headers: authResult.headers,
-    error: authResult.error
+    error: authResult.error,
   };
 }
 
@@ -197,12 +203,12 @@ export async function checkSessionTimeout(request: Request): Promise<{
   error?: AuthError;
 }> {
   const authResult = await authenticateUser(request);
-  
-  return { 
-    userId: authResult.userId, 
-    headers: authResult.headers, 
+
+  return {
+    userId: authResult.userId,
+    headers: authResult.headers,
     isExpired: authResult.isExpired,
-    error: authResult.error
+    error: authResult.error,
   };
 }
 
@@ -217,23 +223,24 @@ export async function protectedRouteAuth(request: Request): Promise<{
 }> {
   // 認証チェック
   const { userId, headers } = await requireAuth(request);
-  
+
   // 認証されたSupabaseクライアントを取得
   try {
-    const authenticatedClient = await SessionService.getAuthenticatedClient(request);
-    
+    const authenticatedClient =
+      await SessionService.getAuthenticatedClient(request);
+
     return {
       userId,
       headers,
-      authenticatedClient
+      authenticatedClient,
     };
   } catch (error) {
-    console.error("Failed to get authenticated client:", error);
-    
+    console.error('Failed to get authenticated client:', error);
+
     // クライアント取得に失敗した場合でも認証は成功しているので続行
     return {
       userId,
-      headers
+      headers,
     };
   }
 }
@@ -241,28 +248,31 @@ export async function protectedRouteAuth(request: Request): Promise<{
 /**
  * ロールベースアクセス制御（RBAC）ミドルウェア
  */
-export async function requireRole(request: Request, requiredRole: string): Promise<{
+export async function requireRole(
+  request: Request,
+  requiredRole: string
+): Promise<{
   userId: string;
   headers?: Headers;
 }> {
   const { userId, headers } = await requireAuth(request);
-  
+
   try {
     // セッションからロール情報を取得
-    const { getSession } = await import("./sessions.server");
-    const session = await getSession(request.headers.get("Cookie"));
-    const roles = session.get("roles") as string[] || [];
-    
+    const { getSession } = await import('./sessions.server');
+    const session = await getSession(request.headers.get('Cookie'));
+    const roles = (session.get('roles') as string[]) || [];
+
     if (!roles.includes(requiredRole)) {
-      const { redirect } = await import("react-router");
-      throw redirect("/forbidden", headers ? { headers } : undefined);
+      const { redirect } = await import('react-router');
+      throw redirect('/forbidden', headers ? { headers } : undefined);
     }
-    
+
     return { userId, headers };
   } catch (error) {
-    console.error("Role check failed:", error);
-    const { redirect } = await import("react-router");
-    throw redirect("/forbidden", headers ? { headers } : undefined);
+    console.error('Role check failed:', error);
+    const { redirect } = await import('react-router');
+    throw redirect('/forbidden', headers ? { headers } : undefined);
   }
 }
 
@@ -274,22 +284,27 @@ export async function requireAuthAPI(request: Request): Promise<{
   headers?: Headers;
 }> {
   const authResult = await authenticateUser(request);
-  
+
   if (!authResult.userId || authResult.shouldRedirect) {
-    const error = authResult.error || createAuthError(AuthErrorCode.SESSION_EXPIRED);
-    
-    throw new Response(JSON.stringify({
-      error: error.code,
-      message: error.message
-    }), {
-      status: 401,
-      headers: {
-        "Content-Type": "application/json",
-        ...(authResult.headers && Object.fromEntries(authResult.headers.entries()))
+    const error =
+      authResult.error || createAuthError(AuthErrorCode.SESSION_EXPIRED);
+
+    throw new Response(
+      JSON.stringify({
+        error: error.code,
+        message: error.message,
+      }),
+      {
+        status: 401,
+        headers: {
+          'Content-Type': 'application/json',
+          ...(authResult.headers &&
+            Object.fromEntries(authResult.headers.entries())),
+        },
       }
-    });
+    );
   }
-  
+
   return { userId: authResult.userId, headers: authResult.headers };
 }
 
@@ -314,26 +329,27 @@ export async function optionalAuth(request: Request): Promise<{
   authenticatedClient?: any;
 }> {
   const authResult = await authenticateUser(request);
-  
+
   if (authResult.userId) {
     try {
-      const authenticatedClient = await SessionService.getAuthenticatedClient(request);
+      const authenticatedClient =
+        await SessionService.getAuthenticatedClient(request);
       return {
         userId: authResult.userId,
         headers: authResult.headers,
-        authenticatedClient
+        authenticatedClient,
       };
     } catch (error) {
-      console.error("Failed to get authenticated client:", error);
+      console.error('Failed to get authenticated client:', error);
       return {
         userId: authResult.userId,
-        headers: authResult.headers
+        headers: authResult.headers,
       };
     }
   }
-  
+
   return {
     userId: null,
-    headers: authResult.headers
+    headers: authResult.headers,
   };
 }

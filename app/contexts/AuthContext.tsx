@@ -1,5 +1,11 @@
 import type { User } from '@supabase/supabase-js';
-import { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  useCallback,
+} from 'react';
 
 import { supabase } from '~/api/supabaseClient';
 
@@ -70,7 +76,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const refreshSession = useCallback(async () => {
     try {
       const { data, error } = await supabase.auth.refreshSession();
-      
+
       if (error) {
         console.error('Error refreshing session:', error);
         setUser(null);
@@ -101,9 +107,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
         const {
           data: { session },
         } = await supabase.auth.getSession();
-        
+
         setUser(session?.user ?? null);
-        
+
         if (session) {
           await syncSessionWithServer(session);
         }
@@ -143,19 +149,24 @@ export function AuthProvider({ children }: AuthProviderProps) {
     });
 
     // 定期的なセッション更新（5分ごと）
-    const sessionRefreshInterval = setInterval(async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (session) {
-        const now = Math.floor(Date.now() / 1000);
-        const expiresAt = session.expires_at || 0;
-        const refreshThreshold = 5 * 60; // 5分前
-        
-        if ((expiresAt - now) < refreshThreshold) {
-          await refreshSession();
+    const sessionRefreshInterval = setInterval(
+      async () => {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+
+        if (session) {
+          const now = Math.floor(Date.now() / 1000);
+          const expiresAt = session.expires_at || 0;
+          const refreshThreshold = 5 * 60; // 5分前
+
+          if (expiresAt - now < refreshThreshold) {
+            await refreshSession();
+          }
         }
-      }
-    }, 5 * 60 * 1000); // 5分ごと
+      },
+      5 * 60 * 1000
+    ); // 5分ごと
 
     return () => {
       subscription.unsubscribe();
@@ -166,17 +177,17 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const signOut = async () => {
     try {
       setIsLoading(true);
-      
+
       // Supabaseからサインアウト
       await supabase.auth.signOut();
-      
+
       // サーバーのセッションもクリア
       if (typeof window !== 'undefined') {
         await fetch('/api/auth/session', {
           method: 'DELETE',
         });
       }
-      
+
       setUser(null);
     } catch (error) {
       console.error('Error signing out:', error);
